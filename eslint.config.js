@@ -29,7 +29,17 @@ const kernelRestrictedProperties = BANNED_MATH.map((name) => ({
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/target/**', '**/pkg/**'],
+    ignores: [
+      '**/dist/**',
+      // Built output of the verification page. Bundled, minified, and not
+      // source — the sources it is built from are linted like everything else.
+      '**/dist-web/**',
+      '**/node_modules/**',
+      '**/target/**',
+      '**/pkg/**',
+      '**/test-results/**',
+      '**/playwright-report/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

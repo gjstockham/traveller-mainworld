@@ -1,0 +1,15 @@
+{
+  // The browser half of the package: the verification page, its worker, and the
+  // Playwright matrix that drives them. Separate from tsconfig.json because
+  // these need DOM and WebWorker libs, are bundled rather than emitted by tsc,
+  // and must not be part of the composite build that produces `dist/`.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "types": ["vite/client", "node"],
+    "resolveJsonModule": true,
+    "noEmit": true
+  },
+  "include": ["web/**/*.ts", "e2e/**/*.ts", "vite.config.ts", "playwright.config.ts"],
+  "references": [{ "path": "../core" }]
+}

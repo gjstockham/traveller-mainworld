@@ -26,9 +26,9 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm build
 
-  # Determinism matrix. PRD §9.1 requires at least two OSes; take all three.
-  # WP4 adds the Playwright browser cells (chromium/firefox/webkit) alongside
-  # this Node reference run.
+  # The Node reference leg of the determinism matrix. PRD §9.1 requires at least
+  # two OSes; take all three. The browser legs are `browser-matrix` below, and
+  # they compare against this same committed manifest.
   test:
     needs: gate
     strategy:
@@ -49,6 +49,51 @@ jobs:
       # The determinism promise itself (PRD R16). Every OS must produce
       # byte-identical hashes; WP4 adds the browser legs of this same check.
       - run: pnpm golden:verify
+
+  # WP4: the browser legs of the determinism matrix — the question Spike A was
+  # opened to answer. Nine cells: chromium, firefox and webkit on all three
+  # OSes, each running the full battery in-page and comparing every hash against
+  # the committed manifest.
+  #
+  # `fail-fast: false` because a divergence is a *finding*: which engines and
+  # which OSes diverge is the evidence ADR-0001 needs, and cancelling the other
+  # eight cells would throw it away. Retries are off in the Playwright config
+  # for the same reason — a hash does not flake.
+  #
+  # Playwright's WebKit is not Safari. Real Safari, iOS Safari and Android
+  # Chrome are hand-checked against the same page; see
+  # docs/evidence/wp4-manual-checks.md.
+  browser-matrix:
+    needs: gate
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        browser: [chromium, firefox, webkit]
+    runs-on: ${{ matrix.os }}
+    name: browser (${{ matrix.browser }}, ${{ matrix.os }})
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The page bundles `core` from its build output, so this has to come
+      # first — and it is the same output the Node reference leg runs.
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - run: pnpm --filter @traveller-mainworld/golden e2e --project=${{ matrix.browser }}
+      # Always, not just on failure: each cell attaches its evidence block —
+      # engine, version, digest, timing — and that is what WP6 cites.
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: battery-${{ matrix.os }}-${{ matrix.browser }}
+          path: packages/golden/test-results/
+          if-no-files-found: ignore
+          retention-days: 30
 
   # WP3: the Rust/WASM twin must hash identically to the TypeScript kernel.
   #

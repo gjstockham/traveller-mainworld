@@ -24,9 +24,12 @@ Requires Node ≥ 22 and pnpm (via `corepack enable pnpm`).
 pnpm install
 pnpm check           # lint + typecheck + build + test
 pnpm golden:verify   # determinism battery vs the committed manifest
+pnpm golden:matrix   # the same battery in chromium, firefox and webkit
 pnpm --filter @traveller-mainworld/viewer dev    # the viewer
 pnpm --filter @traveller-mainworld/viewer e2e    # headless smoke tests
 ```
+
+The matrix needs browsers: `pnpm exec playwright install chromium firefox webkit`.
 
 The WASM twin additionally needs Rust and the wasm32 target
 (`rustup target add wasm32-unknown-unknown`):
@@ -96,6 +99,36 @@ committed in `packages/golden/manifest.json`.
 Running that battery on every browser and OS, and against the WASM kernel, is
 what turns "should be identical" into "demonstrably is". CI fails on any
 mismatch.
+
+## The cross-platform matrix
+
+The determinism promise is a claim about *other people's* engines, so the
+battery runs on all of them: chromium, firefox and webkit × ubuntu, macOS and
+Windows, alongside the Node reference run on the same three OSes. Nine browser
+cells, each comparing every hash against the same committed manifest.
+
+```sh
+pnpm golden:matrix   # all three engines locally (needs: pnpm exec playwright install)
+pnpm golden:page     # serve verify.html on :4174 for a hand-check on a real device
+```
+
+A mismatch there is not a flake to retry — it is Spike A answering its question,
+and per the spike plan it selects the WASM kernel on correctness grounds
+regardless of performance. So the cells never retry, `fail-fast` is off so every
+engine reports, and the failure names the first divergent case and its index.
+
+Playwright's WebKit is **not** Safari, so the matrix cannot close this on its
+own. Real Safari, iOS Safari and Android Chrome are hand-checked against
+`packages/golden/verify.html` — a static page that runs the same battery in a
+worker and prints PASS/FAIL, the digest, and a copy-paste evidence block.
+Results and method live in
+[docs/evidence/wp4-manual-checks.md](docs/evidence/wp4-manual-checks.md).
+
+That page must keep working in a browser, which means nothing on its import
+graph may reach `@traveller-mainworld/golden/node` — the one module that touches
+`node:fs`. `scripts/check-browser-battery.mjs` walks the graph from the HTML
+entry through the worker and into `core`, and fails `pnpm lint` on any Node
+import, rather than leaving it to a bundler error or, worse, a silent shim.
 
 An intentional output change requires, **in the same PR**: a generator version
 bump, a regenerated manifest (`pnpm golden:update`, which refuses to run without

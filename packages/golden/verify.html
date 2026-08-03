@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Determinism battery — Traveller Mainworld</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        padding: 1.5rem 1rem 4rem;
+        background: #05070d;
+        color: #c8d0e0;
+        font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      main {
+        max-width: 46rem;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 1.2rem;
+        margin: 0 0 0.25rem;
+      }
+      h2 {
+        font-size: 1rem;
+        margin: 2rem 0 0.5rem;
+        color: #8b97ad;
+      }
+      p.sub {
+        margin: 0 0 1.25rem;
+        color: #8b97ad;
+      }
+      #status {
+        padding: 0.75rem 1rem;
+        border-radius: 4px;
+        border: 1px solid #2a3446;
+        background: #0b101a;
+        font-weight: 700;
+        overflow-wrap: anywhere;
+      }
+      #status[data-status='pass'] {
+        border-color: #1f7a4d;
+        background: #08251a;
+        color: #57d99a;
+      }
+      #status[data-status='fail'],
+      #status[data-status='error'] {
+        border-color: #8b2f38;
+        background: #260d11;
+        color: #ff8a94;
+      }
+      p.warning {
+        color: #e2c15c;
+        border-left: 2px solid #e2c15c;
+        padding-left: 0.75rem;
+      }
+      dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 0.15rem 1rem;
+        margin: 1rem 0 0;
+      }
+      dt {
+        color: #8b97ad;
+      }
+      dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+      .scroll {
+        overflow-x: auto;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 13px;
+      }
+      th {
+        text-align: left;
+        color: #8b97ad;
+        font-weight: 400;
+        border-bottom: 1px solid #2a3446;
+      }
+      td,
+      th {
+        padding: 0.15rem 0.75rem 0.15rem 0;
+        white-space: nowrap;
+      }
+      tr[data-ok='false'] td {
+        color: #ff8a94;
+      }
+      pre {
+        background: #0b101a;
+        border: 1px solid #2a3446;
+        border-radius: 4px;
+        padding: 0.75rem 1rem;
+        overflow-x: auto;
+        white-space: pre;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        background: #161f30;
+        border: 1px solid #2a3446;
+        border-radius: 4px;
+        padding: 0.4rem 0.9rem;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Determinism battery</h1>
+      <p class="sub">
+        Runs the full battery in this browser and compares every hash against the committed
+        manifest. Takes a minute or two; leave the tab in the foreground.
+      </p>
+
+      <div id="status" data-status="starting">Loading…</div>
+
+      <dl id="summary"></dl>
+
+      <h2>Cases</h2>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>case</th>
+              <th>vs manifest</th>
+              <th>hash</th>
+            </tr>
+          </thead>
+          <tbody id="cases"></tbody>
+        </table>
+      </div>
+
+      <pre id="detail" hidden></pre>
+
+      <h2>Evidence</h2>
+      <p class="sub">Paste this into the WP4 evidence table.</p>
+      <pre id="evidence"></pre>
+      <button id="copy" hidden>Copy evidence</button>
+    </main>
+    <script type="module" src="/web/verify.ts"></script>
+  </body>
+</html>

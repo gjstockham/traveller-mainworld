@@ -22,12 +22,19 @@
   ],
   "scripts": {
     "build": "tsc -b",
-    "typecheck": "tsc -b --noEmit false --emitDeclarationOnly",
+    "typecheck": "tsc -b --noEmit false --emitDeclarationOnly && tsc -p tsconfig.web.json",
     "golden:verify": "node dist/cli.js verify",
     "golden:update": "node dist/cli.js update",
-    "golden:parity": "node dist/parity-cli.js"
+    "golden:parity": "node dist/parity-cli.js",
+    "build:web": "vite build",
+    "preview:web": "vite preview --port 4174 --strictPort --host 127.0.0.1",
+    "serve:web": "vite build && vite preview --port 4174 --strictPort --host",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@traveller-mainworld/core": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^7.1.12"
   }
 }
