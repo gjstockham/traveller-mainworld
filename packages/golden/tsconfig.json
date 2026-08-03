@@ -3,7 +3,10 @@
   "compilerOptions": {
     "composite": true,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    // The CLI runs under Node; the battery itself stays platform-neutral so it
+    // can also run in the browser verification page (WP4).
+    "types": ["node"]
   },
   "include": ["src/**/*.ts"],
   "references": [{ "path": "../core" }]

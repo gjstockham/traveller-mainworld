@@ -14,10 +14,13 @@
     "lint": "eslint . && pnpm lint:kernel",
     "lint:kernel": "node scripts/check-kernel-whitelist.mjs",
     "typecheck": "pnpm -r typecheck",
-    "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm test"
+    "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm test",
+    "golden:verify": "pnpm --filter @traveller-mainworld/golden build && pnpm --filter @traveller-mainworld/golden golden:verify",
+    "golden:update": "pnpm --filter @traveller-mainworld/golden build && pnpm --filter @traveller-mainworld/golden golden:update"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@types/node": "^26.1.2",
     "eslint": "^9.39.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.4",

@@ -46,3 +46,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
+      # The determinism promise itself (PRD R16). Every OS must produce
+      # byte-identical hashes; WP4 adds the browser legs of this same check.
+      - run: pnpm golden:verify

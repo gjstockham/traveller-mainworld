@@ -1,0 +1,90 @@
+{
+  "genVersion": "0.1.0",
+  "digest": "0c6181a006c94e6173d93e842a77736015f7ccf49cdb6a3abf707ad47f08bdf7",
+  "cases": {
+    "ops.powi3": {
+      "hash": "8b15f5e1d718cfd41a4b4d5c53b6b6a56888cc87bdec2611b932895b5256582c",
+      "samples": 1000000
+    },
+    "ops.powi7": {
+      "hash": "7193449bc8887b1255a0cf0ba16465f80526d04fba9d4d7db6e0bcefe1c25ee9",
+      "samples": 1000000
+    },
+    "ops.smoothstep": {
+      "hash": "0167c4d7798084b8ebe9d7079d2b5dca7134f99ef2d92e7780864579820b631d",
+      "samples": 1000000
+    },
+    "ops.smootherstep": {
+      "hash": "80f739ccd6acc5f0b377410b368d13a502ffc742eb2d6284c7678df490600e2a",
+      "samples": 1000000
+    },
+    "ops.lerp": {
+      "hash": "b17a2271d649307da85b0a08fabaa98bc24da2c676f50f4f41511dd0db477865",
+      "samples": 1000000
+    },
+    "hash.mix32": {
+      "hash": "dbe80eb7a3bb93d675d0c78d48b11df82c70e7cef4b2c0f39e38dfe924e1b6e2",
+      "samples": 1000000
+    },
+    "hash.hash1_2_3": {
+      "hash": "780f25091b09bd0ceb0037eae7af10ec1c02620c680af976a3c292b4dfa4bc97",
+      "samples": 1000000
+    },
+    "rng.sfc32": {
+      "hash": "a8777d2027b65457b4b2f003845d02ef57e5d618b77907f035c0613ad2155a4d",
+      "samples": 1000000
+    },
+    "rng.streamSeed": {
+      "hash": "ffd2afda7ddc2df953b733a9678931052df42d43753aab63659d62780e3d7ae6",
+      "samples": 1000000
+    },
+    "rng.tileRng": {
+      "hash": "90091157f2f1d3951892ae953f3f978b37fba1c199a8ef976b6f2619aa5f7890",
+      "samples": 1000000
+    },
+    "rng.hashSeedString": {
+      "hash": "68363cde98ac102bce350f35b2df33326985ed4a1a1b81c77969cb4ea6da96e5",
+      "samples": 1000000
+    },
+    "approx.tanCore": {
+      "hash": "5db378a67ddf46e614ddebebf671b64e3574916b46f5dc293e924d70c31b8465",
+      "samples": 1000000
+    },
+    "approx.atanCore": {
+      "hash": "86c71fccd60785e7f0bc39ebdd4a82e5d60f36cccf2db2afb6e277af56a4eec2",
+      "samples": 1000000
+    },
+    "approx.tanWarp": {
+      "hash": "2857abfcb770926af128f4c88d67c4facd0c6868a5306e6a7e9f41d2d58b9228",
+      "samples": 1000000
+    },
+    "approx.atanWarpInverse": {
+      "hash": "4ecbafe0b002d421c73c31bbe27daf6d6e9ef3d8cafd3a3b595b7b8afb70770b",
+      "samples": 1000000
+    },
+    "approx.rationalBump": {
+      "hash": "3d0ebd136d1c39e7a89939b15b7299a7d255573fd475c03a1abee6cef27ecad5",
+      "samples": 1000000
+    },
+    "approx.compactFalloff": {
+      "hash": "0da58bcf4881eeefced62d7b67f0bf26a3ee17fa97e0e77d2e28d1221f84bc2e",
+      "samples": 1000000
+    },
+    "noise.gradient3": {
+      "hash": "21e92b0f216b4840215f281d8d8ba3adccfd6a9b8c724b75fd015d997fba3633",
+      "samples": 1000000
+    },
+    "noise.fbm3": {
+      "hash": "896804876f3f48d4ffae6edf43b5bb8e4f67166acb746f74948acb54ac0d36ee",
+      "samples": 1000000
+    },
+    "geometry.faceUvToDirection": {
+      "hash": "ffeba6b51ed349eb464f72089b8d43efa4e2bd223d401454c1e3c38813e919c7",
+      "samples": 1002528
+    },
+    "tile.composite": {
+      "hash": "a200deef2fff84680a7a91eaea5b6d2ab9f34e219c7d56810bb95878d3c3a56f",
+      "samples": 1397844
+    }
+  }
+}

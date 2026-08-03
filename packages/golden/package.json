@@ -6,7 +6,9 @@
   "description": "Golden-hash fixtures, manifest and runners (PRD R16).",
   "scripts": {
     "build": "tsc -b",
-    "typecheck": "tsc -b --noEmit false --emitDeclarationOnly"
+    "typecheck": "tsc -b --noEmit false --emitDeclarationOnly",
+    "golden:verify": "node dist/cli.js verify",
+    "golden:update": "node dist/cli.js update"
   },
   "dependencies": {
     "@traveller-mainworld/core": "workspace:*"

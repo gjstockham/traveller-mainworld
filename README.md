@@ -20,9 +20,27 @@ Requires Node ≥ 22 and pnpm (via `corepack enable pnpm`).
 
 ```sh
 pnpm install
-pnpm check      # lint + typecheck + build + test
+pnpm check           # lint + typecheck + build + test
+pnpm golden:verify   # determinism battery vs the committed manifest
 pnpm --filter @traveller-mainworld/viewer dev
 ```
+
+## The determinism battery
+
+`packages/golden` evaluates every kernel function over ≥10⁶ deliberately hostile
+inputs — signed zeros, denormals, the normal/denormal boundary, ulp neighbours
+of integers and powers of two, and magnitudes at both ends of the double range —
+then hashes the canonical little-endian bytes of the results. Those hashes are
+committed in `packages/golden/manifest.json`.
+
+Running that battery on every browser and OS, and later against the WASM kernel,
+is what turns "should be identical" into "demonstrably is". CI fails on any
+mismatch.
+
+An intentional output change requires, **in the same PR**: a generator version
+bump, a regenerated manifest (`pnpm golden:update`, which refuses to run without
+the bump), and a changelog entry. The manifest diff makes silent drift
+impossible.
 
 ## The kernel whitelist
 
