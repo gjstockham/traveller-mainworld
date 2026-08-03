@@ -15,3 +15,6 @@ blob-report/
 # Editors / OS
 .DS_Store
 *.log
+
+# Playwright smoke-test artefacts
+packages/viewer/e2e/output/

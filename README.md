@@ -22,8 +22,35 @@ Requires Node ≥ 22 and pnpm (via `corepack enable pnpm`).
 pnpm install
 pnpm check           # lint + typecheck + build + test
 pnpm golden:verify   # determinism battery vs the committed manifest
-pnpm --filter @traveller-mainworld/viewer dev
+pnpm --filter @traveller-mainworld/viewer dev    # the viewer
+pnpm --filter @traveller-mainworld/viewer e2e    # headless smoke tests
 ```
+
+The viewer takes `?seed=<text>` to change world, and `?debug=1` to preserve the
+WebGL drawing buffer so pixels can be read back.
+
+## Skirts and seams
+
+Tiles stream in independently and out of order, so where two LOD levels meet a
+crack can open. Rather than stitching edges — which would need neighbour
+awareness inside generation — each tile carries a **skirt**: a wall of
+duplicated edge vertices pushed inward to plug the gap from behind.
+
+Skirts are not free. The wall is near-radial, so it is barely lit and renders
+almost black; multisampling then blends the surface against it and leaves a
+hairline at every tile join. Drawn unconditionally, that is a dark grid tracing
+the whole quadtree across the globe.
+
+So skirts are drawn **only where they are needed**. Adjacent tiles at the same
+depth share their edge vertices bit-for-bit (the kernel's seam guarantee), so
+there is no crack between them and no wall required. `lod/neighbours.ts` works
+out which of a tile's four edges face a different LOD and selects one of sixteen
+prebuilt index buffers accordingly.
+
+*Known limitation:* edges crossing a **cube-face boundary** are still skirted
+unconditionally, because cross-face adjacency needs a rotation table the viewer
+does not yet carry. Twelve cube edges are affected, and a faint seam is visible
+along them at some angles.
 
 ## The determinism battery
 
