@@ -1,0 +1,17 @@
+{
+  "name": "@traveller-mainworld/bench",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Spike B performance baseline. Measures the kernels against the PRD R13 budgets.",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --noEmit false --emitDeclarationOnly",
+    "bench": "node dist/cli.js",
+    "bench:quick": "node dist/cli.js --quick"
+  },
+  "dependencies": {
+    "@traveller-mainworld/core": "workspace:*",
+    "@traveller-mainworld/golden": "workspace:*"
+  }
+}

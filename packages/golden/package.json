@@ -4,6 +4,22 @@
   "private": true,
   "type": "module",
   "description": "Golden-hash fixtures, manifest and runners (PRD R16).",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/wasmLoader.d.ts",
+      "default": "./dist/wasmLoader.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "manifest.json"
+  ],
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b --noEmit false --emitDeclarationOnly",

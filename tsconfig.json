@@ -4,6 +4,7 @@
   "references": [
     { "path": "./packages/core" },
     { "path": "./packages/golden" },
-    { "path": "./packages/viewer" }
+    { "path": "./packages/viewer" },
+    { "path": "./bench" }
   ]
 }

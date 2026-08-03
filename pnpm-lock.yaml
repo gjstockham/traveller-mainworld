@@ -30,6 +30,15 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@26.1.2)(supports-color@7.2.0)
 
+  bench:
+    dependencies:
+      '@traveller-mainworld/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      '@traveller-mainworld/golden':
+        specifier: workspace:*
+        version: link:../packages/golden
+
   packages/core: {}
 
   packages/golden:

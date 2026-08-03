@@ -13,6 +13,7 @@ A browser-based tool that turns a Universal Planetary Profile (UPP) plus a seed 
 | `packages/viewer` | Three.js cube-sphere viewer (Vite). |
 | `packages/golden` | Golden-hash fixtures, manifest and runners. |
 | `crates/kernel-wasm` | Rust→wasm32 twin of the kernel. Must hash identically to it. |
+| `bench` | Spike B performance baseline, and the results it produced. |
 | `scripts` | Repo checks run in CI. |
 
 ## Getting started
@@ -35,6 +36,28 @@ pnpm check:parity    # build the twin, run its Rust tests, compare both kernels
 ```
 
 Without it, `pnpm check` still passes: the parity tests skip, loudly.
+
+## Benchmarks
+
+```sh
+pnpm bench           # writes bench/results/phase0.md
+pnpm bench:quick     # reduced iterations, for checking the harness
+```
+
+Measures the kernels against the PRD R13 budgets — ≈100 ms per tile
+single-threaded, ≥25 tiles/s sustained pool throughput — and produces the
+evidence half of the WP6 kernel decision. Run it on an idle machine.
+
+Benchmarks are measurement code, and unmeasured measurement code reports
+whatever it likes, so the harness has tests of its own and the defences are
+deliberate: warm-up before timing, a printed sink so nothing can be eliminated
+as dead code, median and p95 rather than a mean, and a control run subtracted
+from the transfer figures. Three numbers in the first draft of the results were
+wrong in ways the table did not show — see `bench/test/harness.test.ts`.
+
+`bench/src/craters.ts` is a **cost model**, not shipping code: Phase 0 has no
+craters, but the budget is for a Phase-1 tile, so the pass is modelled at
+representative density outside `packages/core` where it cannot touch a hash.
 
 The viewer takes `?seed=<text>` to change world, and `?debug=1` to preserve the
 WebGL drawing buffer so pixels can be read back.
