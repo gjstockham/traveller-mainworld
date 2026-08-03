@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Rust / wasm (WP3)
+target/
+pkg/
+
+# Playwright (WP4)
+test-results/
+playwright-report/
+blob-report/
+
+# Editors / OS
+.DS_Store
+*.log

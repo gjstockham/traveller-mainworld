@@ -1,0 +1,5 @@
+packages:
+  - 'packages/*'
+# esbuild's install script links its platform-native binary; vite/vitest need it.
+allowBuilds:
+  esbuild: true

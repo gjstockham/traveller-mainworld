@@ -1,0 +1,20 @@
+{
+  "name": "@traveller-mainworld/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless deterministic world generation. Zero rendering dependencies (PRD R9).",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --noEmit false --emitDeclarationOnly"
+  }
+}

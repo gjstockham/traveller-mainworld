@@ -1,0 +1,14 @@
+{
+  "name": "@traveller-mainworld/golden",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Golden-hash fixtures, manifest and runners (PRD R16).",
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --noEmit false --emitDeclarationOnly"
+  },
+  "dependencies": {
+    "@traveller-mainworld/core": "workspace:*"
+  }
+}
