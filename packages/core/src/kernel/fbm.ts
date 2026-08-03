@@ -16,7 +16,7 @@
 import { gradientNoise3 } from './noise.js';
 import { MAX_OCTAVES, OCTAVE_ROTATIONS } from './rotations.js';
 
-export { MAX_OCTAVES };
+export { MAX_OCTAVES, OCTAVE_ROTATIONS };
 
 /** Parameters of one fBm field. */
 export interface FbmParams {

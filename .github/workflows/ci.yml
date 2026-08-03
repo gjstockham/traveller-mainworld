@@ -49,3 +49,38 @@ jobs:
       # The determinism promise itself (PRD R16). Every OS must produce
       # byte-identical hashes; WP4 adds the browser legs of this same check.
       - run: pnpm golden:verify
+
+  # WP3: the Rust/WASM twin must hash identically to the TypeScript kernel.
+  #
+  # A separate job rather than a matrix cell, because it is the only one needing
+  # a Rust toolchain and because its failure means something different from the
+  # others: the matrix asks "does this kernel agree with itself everywhere?",
+  # this asks "do two independent implementations agree with each other?". One
+  # platform is enough for that — the twin is compared against the TypeScript
+  # kernel, and the TypeScript kernel is what the matrix carries across
+  # platforms.
+  #
+  # `pnpm golden:parity` fails on a missing .wasm rather than skipping. The
+  # unit-suite parity test does skip, so that a clone without Rust can still run
+  # `pnpm test`; this job is what makes the check non-optional.
+  wasm-parity:
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Relaxed-SIMD is nondeterministic by design. This runs with rustc present,
+      # so the authoritative effective-flag probe is not skipped here.
+      - run: pnpm lint:wasm
+      - run: pnpm wasm:build
+      - run: pnpm wasm:test
+      - run: pnpm build
+      - run: pnpm golden:parity

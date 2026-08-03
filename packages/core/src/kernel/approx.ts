@@ -117,13 +117,18 @@ export function atanCore(x: number): number {
 /**
  * `tan(π/4)` as this module computes it.
  *
+ * Exported so the WP3 parity harness can compare it against the WASM twin's
+ * value bit-for-bit, rather than inferring agreement from downstream hashes: if
+ * the two divisors differ, every warped coordinate on the sphere differs, and
+ * saying so directly beats reporting that eleven battery cases disagree.
+ *
  * Deliberately evaluated rather than hard-coded, so that {@link tanWarp} at
  * `u = ±1` divides a value by *itself* and yields exactly ±1. That exactness
  * is what makes adjacent cube faces meet: face edges are at `u = ±1`, and if
  * the warp returned 1−1ulp there, the two faces would compute different 3D
  * positions for the same edge and the noise field would tear along every seam.
  */
-const TAN_AT_ONE = tanCore(PI_OVER_4);
+export const TAN_AT_ONE = tanCore(PI_OVER_4);
 
 /**
  * Tangent-adjusted cube-sphere warp: maps face coordinate `u ∈ [−1, 1]` onto

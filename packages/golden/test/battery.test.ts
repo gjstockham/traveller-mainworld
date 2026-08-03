@@ -6,7 +6,8 @@ import { GEN_VERSION } from '@traveller-mainworld/core';
 import { describe, expect, it } from 'vitest';
 
 import { EDGE_VALUES, adversarialArray, nextAfter } from '../src/adversarial.js';
-import { BATTERY, SAMPLES, batteryDigest, runBattery, runCase } from '../src/battery.js';
+import { BATTERY, FULL_BATTERY, batteryDigest, runBattery, runCase } from '../src/battery.js';
+import { tsKernelApi } from '../src/kernelApi.js';
 import {
   type Manifest,
   buildManifest,
@@ -77,7 +78,7 @@ describe('battery composition', () => {
   it('samples at least 1e6 values per case', () => {
     // The spike plan's bar. Enforced here so a case cannot quietly shrink.
     for (const [name, entry] of Object.entries(MANIFEST.cases)) {
-      expect(entry.samples, name).toBeGreaterThanOrEqual(SAMPLES);
+      expect(entry.samples, name).toBeGreaterThanOrEqual(FULL_BATTERY.samples);
     }
   });
 });
@@ -133,7 +134,7 @@ describe('the committed manifest', () => {
   it('matches a full battery run on this platform', { timeout: 300_000 }, () => {
     // The determinism promise, checked end to end on the reference platform.
     // The cross-browser and cross-OS legs of this same comparison are WP4.
-    const results = runBattery();
+    const results = runBattery(tsKernelApi());
     const mismatches = compareToManifest(MANIFEST, results);
     expect(formatMismatches(mismatches)).toMatch(/All battery hashes match/);
     expect(batteryDigest(results)).toBe(MANIFEST.digest);
@@ -151,8 +152,9 @@ describe('the committed manifest', () => {
       (c) => c.name.startsWith('rng.') || c.name.startsWith('tile.'),
     );
     expect(stateful.length).toBeGreaterThan(2);
-    const a = stateful.map((c) => runCase(c).hash);
-    const b = stateful.map((c) => runCase(c).hash);
+    const ts = tsKernelApi();
+    const a = stateful.map((c) => runCase(c, ts).hash);
+    const b = stateful.map((c) => runCase(c, ts).hash);
     expect(b).toEqual(a);
   });
 });

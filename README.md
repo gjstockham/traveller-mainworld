@@ -12,6 +12,7 @@ A browser-based tool that turns a Universal Planetary Profile (UPP) plus a seed 
 | `packages/core/src/kernel` | **The whitelisted zone** — see below. |
 | `packages/viewer` | Three.js cube-sphere viewer (Vite). |
 | `packages/golden` | Golden-hash fixtures, manifest and runners. |
+| `crates/kernel-wasm` | Rust→wasm32 twin of the kernel. Must hash identically to it. |
 | `scripts` | Repo checks run in CI. |
 
 ## Getting started
@@ -25,6 +26,15 @@ pnpm golden:verify   # determinism battery vs the committed manifest
 pnpm --filter @traveller-mainworld/viewer dev    # the viewer
 pnpm --filter @traveller-mainworld/viewer e2e    # headless smoke tests
 ```
+
+The WASM twin additionally needs Rust and the wasm32 target
+(`rustup target add wasm32-unknown-unknown`):
+
+```sh
+pnpm check:parity    # build the twin, run its Rust tests, compare both kernels
+```
+
+Without it, `pnpm check` still passes: the parity tests skip, loudly.
 
 The viewer takes `?seed=<text>` to change world, and `?debug=1` to preserve the
 WebGL drawing buffer so pixels can be read back.
@@ -60,8 +70,8 @@ of integers and powers of two, and magnitudes at both ends of the double range �
 then hashes the canonical little-endian bytes of the results. Those hashes are
 committed in `packages/golden/manifest.json`.
 
-Running that battery on every browser and OS, and later against the WASM kernel,
-is what turns "should be identical" into "demonstrably is". CI fails on any
+Running that battery on every browser and OS, and against the WASM kernel, is
+what turns "should be identical" into "demonstrably is". CI fails on any
 mismatch.
 
 An intentional output change requires, **in the same PR**: a generator version
@@ -83,6 +93,40 @@ Two independent checks enforce this, and both must be defeated to get a banned o
 
 1. `eslint.config.js` — `no-restricted-properties` / `no-restricted-syntax` scoped to `kernel/**`.
 2. `scripts/check-kernel-whitelist.mjs` — a source scan that does **not** honour `eslint-disable`, and additionally rejects any import that leaves the kernel directory.
+
+## The WASM twin
+
+`crates/kernel-wasm` is the same kernel written again in Rust. The point is not
+redundancy: the two implementations must hash identically **to each other**, not
+merely each be self-consistent. A kernel compared against its own past output
+proves it is stable; two kernels compared against each other proves they are
+*right*, because a bug would have to be reproduced independently in two
+languages to survive. `pnpm golden:parity` runs the whole battery through both
+and compares. That comparison is the reason the twin exists.
+
+It is built as a raw `cdylib` with `#[no_mangle] pub extern "C"` exports over
+linear memory — **no wasm-bindgen, no wasm-pack**. Those tools generate glue
+that sits between the source and the float operations being judged, which is
+precisely what must not be in the loop. The binding in `core/src/wasm` is
+hand-written `DataView` work instead.
+
+Three rules silently destroy the guarantee if broken, so each has a check:
+
+| Rule | Why | Enforced by |
+|---|---|---|
+| Never enable `relaxed-simd` | Nondeterministic **by design** — its instructions may choose between fused and unfused multiply-add per implementation. Fixed-width `simd128` is fine. | `scripts/check-wasm-flags.mjs`, which asks rustc what it would actually enable |
+| Never call Rust's libm (`sin`, `powf`, `mul_add`, …) | Deterministic *within* WASM, which is the trap: the twin must match the **TypeScript**, which evaluates polynomials. `sqrt`/`abs`/`floor` are fine — spec-exact WASM instructions. | `scripts/check-kernel-whitelist.mjs` |
+| Never recompute `OCTAVE_ROTATIONS` | A committed generated artefact. Rust's `sin` is not V8's, so recomputing would rotate the fBm octaves differently. | `scripts/gen-wasm-rotations.mjs --check` transcribes it and CI verifies it is current |
+
+Rust and JavaScript also disagree on three things that look like faithful
+translations: `x | 0` wraps where `as i32` saturates, `Math.min`/`Math.max`
+order signed zeros and propagate NaN where `f64::min`/`f64::max` do neither, and
+`f64::round` breaks ties away from zero where `Math.round` breaks them toward
++∞. `crates/kernel-wasm/src/jsnum.rs` reproduces the JavaScript semantics; the
+banned-method scan covers the rest.
+
+If the TypeScript kernel wins the WP6 decision, this crate is **archived, not
+maintained**.
 
 ## Licensing
 

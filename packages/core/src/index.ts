@@ -27,5 +27,11 @@ export * from './kernel/cubesphere.js';
 export type { PhysicalWorldSpec, World } from './spec.js';
 export * from './tile/generator.js';
 
+// The WASM kernel twin (WP3). Marshalling only — no generation arithmetic — so
+// it sits outside the whitelisted zone. Loading the module is the caller's job,
+// which keeps this import free of any Node or browser specifics.
+export * from './wasm/kernel.js';
+export * from './wasm/generator.js';
+
 // Verification.
 export * from './digest/index.js';

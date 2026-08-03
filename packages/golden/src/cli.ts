@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { GEN_VERSION } from '@traveller-mainworld/core';
 
 import { runBattery } from './battery.js';
+import { tsKernelApi } from './kernelApi.js';
 import { type Manifest, buildManifest, compareToManifest, formatMismatches } from './manifest.js';
 
 const MANIFEST_PATH = join(dirname(fileURLToPath(import.meta.url)), '../manifest.json');
@@ -32,8 +33,12 @@ function run(): number {
   const mode = process.argv[2] ?? 'verify';
   const started = Date.now();
 
-  process.stdout.write(`Running determinism battery (generator ${GEN_VERSION})\n`);
-  const results = runBattery((r) => {
+  // The manifest records the *TypeScript* kernel's output: it is the reference
+  // the cross-platform matrix compares against, and the kernel the viewer ships
+  // until WP6 says otherwise. The WASM twin is compared against it separately,
+  // by `golden:parity`.
+  process.stdout.write(`Running determinism battery (generator ${GEN_VERSION}, typescript kernel)\n`);
+  const results = runBattery(tsKernelApi(), undefined, (r) => {
     process.stdout.write(`  ${r.name.padEnd(28)} ${r.hash.slice(0, 16)}…  (${r.samples} values)\n`);
   });
   process.stdout.write(`Battery finished in ${((Date.now() - started) / 1000).toFixed(1)}s\n\n`);

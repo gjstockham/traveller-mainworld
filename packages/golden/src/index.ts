@@ -7,4 +7,6 @@
  */
 export * from './adversarial.js';
 export * from './battery.js';
+export * from './kernelApi.js';
 export * from './manifest.js';
+export * from './parity.js';

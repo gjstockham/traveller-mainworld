@@ -11,12 +11,17 @@
     "build": "pnpm -r build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint . && pnpm lint:kernel",
+    "lint": "eslint . && pnpm lint:kernel && pnpm lint:wasm",
     "lint:kernel": "node scripts/check-kernel-whitelist.mjs",
     "typecheck": "pnpm -r typecheck",
     "check": "pnpm lint && pnpm typecheck && pnpm build && pnpm test",
     "golden:verify": "pnpm --filter @traveller-mainworld/golden build && pnpm --filter @traveller-mainworld/golden golden:verify",
-    "golden:update": "pnpm --filter @traveller-mainworld/golden build && pnpm --filter @traveller-mainworld/golden golden:update"
+    "golden:update": "pnpm --filter @traveller-mainworld/golden build && pnpm --filter @traveller-mainworld/golden golden:update",
+    "lint:wasm": "node scripts/check-wasm-flags.mjs && node scripts/gen-wasm-rotations.mjs --check",
+    "wasm:build": "node scripts/build-wasm.mjs",
+    "wasm:test": "cargo test --release --manifest-path crates/kernel-wasm/Cargo.toml",
+    "golden:parity": "pnpm --filter @traveller-mainworld/golden build && pnpm --filter @traveller-mainworld/golden golden:parity",
+    "check:parity": "pnpm wasm:build && pnpm wasm:test && pnpm golden:parity"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
