@@ -95,37 +95,16 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-  # WP3: the Rust/WASM twin must hash identically to the TypeScript kernel.
+  # The Rust/WASM twin used to be a required job here. ADR-0001 selected the
+  # TypeScript kernel and archived the crate, so the parity check moved to
+  # `.github/workflows/wasm-parity.yml` — workflow_dispatch plus a monthly
+  # schedule. It is still the only evidence that two independent implementations
+  # agree, so it is archived rather than deleted, and ADR-0001's revisit trigger
+  # names it. `pnpm check:parity` runs the same thing locally.
   #
-  # A separate job rather than a matrix cell, because it is the only one needing
-  # a Rust toolchain and because its failure means something different from the
-  # others: the matrix asks "does this kernel agree with itself everywhere?",
-  # this asks "do two independent implementations agree with each other?". One
-  # platform is enough for that — the twin is compared against the TypeScript
-  # kernel, and the TypeScript kernel is what the matrix carries across
-  # platforms.
-  #
-  # `pnpm golden:parity` fails on a missing .wasm rather than skipping. The
-  # unit-suite parity test does skip, so that a clone without Rust can still run
-  # `pnpm test`; this job is what makes the check non-optional.
-  wasm-parity:
-    needs: gate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      # Relaxed-SIMD is nondeterministic by design. This runs with rustc present,
-      # so the authoritative effective-flag probe is not skipped here.
-      - run: pnpm lint:wasm
-      - run: pnpm wasm:build
-      - run: pnpm wasm:test
-      - run: pnpm build
-      - run: pnpm golden:parity
+  # `pnpm lint:wasm` stays in the `gate` job above: the twin's three rules —
+  # never enable the relaxed SIMD proposal, never call Rust libm, never
+  # recompute OCTAVE_ROTATIONS — hold while the crate exists, archived or not.
+  # (Spelled without the hyphen on purpose: check-wasm-flags.mjs scans this file
+  # as plain text and cannot tell a comment from a build flag, which is exactly
+  # the bluntness that makes it hard to fool.)

@@ -1,0 +1,60 @@
+name: WASM parity (archived twin)
+
+# The Rust/WASM twin is archived, not deleted — ADR-0001.
+#
+# It moved off the required CI path because a crate nobody maintains will drift,
+# and a drifted crate reddening an unrelated pull request teaches people to
+# ignore red. But the mutual parity check is the only evidence the project has
+# that *two independent implementations agree*, rather than one implementation
+# being self-consistently wrong; a check that has left CI and is never run again
+# is a check that has been deleted with extra steps.
+#
+# So it runs two ways:
+#
+#   workflow_dispatch — on demand. Run this before acting on ADR-0001's revisit
+#     trigger, and after any change under packages/core/src/kernel/**, which is
+#     the change that can make the two kernels disagree.
+#   schedule — monthly, so drift is discovered by a calendar rather than by
+#     someone needing the twin in a hurry. A scheduled failure gates nothing.
+#
+# Note: GitHub disables scheduled workflows after 60 days without repository
+# activity, and re-enabling is manual. If the monthly run has gone quiet, that
+# is why — it is not evidence of agreement.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 04:00 UTC on the 1st of each month.
+    - cron: '0 4 1 * *'
+
+concurrency:
+  group: wasm-parity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  parity:
+    name: TypeScript kernel vs WASM twin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The relaxed SIMD proposal is nondeterministic by design. `pnpm lint`
+      # runs this too, but skips the effective-flag probe where rustc is absent —
+      # which is every runner except this one. Here the probe is authoritative.
+      # (Feature name spelled without the hyphen: check-wasm-flags.mjs scans this
+      # file as plain text and cannot tell a comment from a build flag.)
+      - run: pnpm lint:wasm
+      - run: pnpm wasm:build
+      - run: pnpm wasm:test
+      - run: pnpm build
+      # The full battery through both kernels. Fails on a missing artefact
+      # rather than skipping; the unit-suite parity test is the one that skips.
+      - run: pnpm golden:parity

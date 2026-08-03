@@ -181,8 +181,28 @@ order signed zeros and propagate NaN where `f64::min`/`f64::max` do neither, and
 +∞. `crates/kernel-wasm/src/jsnum.rs` reproduces the JavaScript semantics; the
 banned-method scan covers the rest.
 
-If the TypeScript kernel wins the WP6 decision, this crate is **archived, not
-maintained**.
+## The kernel decision
+
+[ADR-0001](docs/adr/ADR-0001-generation-kernel.md) selected the **TypeScript
+kernel** — provisionally, because six of the nine matrix cells and all three
+manual device checks had not run when it was written. The ADR says so in its own
+words rather than citing evidence that does not exist; filling in
+[the evidence file](docs/evidence/wp4-manual-checks.md) is what promotes it from
+Provisional to Accepted, and a divergence anywhere rewrites it as a WASM decision
+on correctness grounds.
+
+So `crates/kernel-wasm` is **archived, not maintained** — see
+[its README](crates/kernel-wasm/README.md). The parity check left the required CI
+path (it would otherwise redden unrelated pull requests as the crate drifts) for
+`.github/workflows/wasm-parity.yml`: `workflow_dispatch` plus a monthly schedule.
+`pnpm check:parity` runs it locally. `pnpm lint:wasm` stays on every commit,
+because the twin's three rules hold while the crate exists.
+
+Which kernel the viewer runs is written down in exactly one place,
+`packages/viewer/src/kernel/choice.ts`; the tile worker names no implementation.
+`packages/viewer/test/tileJob.test.ts` runs the real WASM twin through the same
+job path and compares the renderer-ready buffers, so "the choice stays revisable"
+is a tested claim rather than a comment.
 
 ## Licensing
 

@@ -14,6 +14,14 @@ every case hash plus the overall digest.
 **Generator version:** 0.1.0
 **Manifest digest:** `0c6181a006c94e6173d93e842a77736015f7ccf49cdb6a3abf707ad47f08bdf7`
 
+> **This file gates ADR-0001.** [ADR-0001](../adr/ADR-0001-generation-kernel.md)
+> selected the TypeScript kernel **provisionally**, because when it was written
+> only the three local Ubuntu cells had run and the three manual rows below were
+> empty. Its revisit trigger R1 is precisely this file: filling in the nine CI
+> cells and M1–M3 all green promotes that ADR from Provisional to Accepted, and
+> any divergence rewrites it as a WASM decision on correctness grounds. Phase 0
+> cannot exit until these rows are filled.
+
 > A divergence is a finding, not a bug to be worked around. Per spike plan §A.3
 > it selects the WASM kernel on **correctness** grounds regardless of
 > performance. Record it here in full — engine, version, OS, which case, both
@@ -32,6 +40,10 @@ divergence would be a browser bug, not a design risk. It is deliberately *not*
 done here (open question 5 in the implementation plan §10). **ADR-0001 must say
 which evidence it relied on** — one-platform TS↔WASM parity, plus a
 nine-cell TS matrix.
+
+It does, in its §"What the evidence does not cover — and which of it this
+decision relied on", including the fact that three of the nine cells had run
+when it was written.
 
 ## Automated: CI matrix
 

@@ -55,6 +55,10 @@ const CONFIG_FILES = [
   'crates/kernel-wasm/rust-toolchain.toml',
   '.cargo/config.toml',
   '.github/workflows/ci.yml',
+  // Where the twin is actually built since ADR-0001 archived it. Adding a
+  // workflow that runs `pnpm wasm:build` without adding it here would move the
+  // build somewhere this scan cannot see.
+  '.github/workflows/wasm-parity.yml',
 ];
 
 const failures = [];
