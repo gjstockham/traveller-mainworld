@@ -23,6 +23,10 @@ export * from './kernel/fbm.js';
 export * from './kernel/tileid.js';
 export * from './kernel/cubesphere.js';
 
+// The input layer (PRD §6.1) — UPP parsing and seed handling. Feeds the ruleset
+// interpreter rather than the kernel: nothing here reaches a golden hash.
+export * from './input/index.js';
+
 // Generation surface.
 export type { PhysicalWorldSpec, World } from './spec.js';
 // The fixture worlds. Here rather than in the golden harness so that the worlds

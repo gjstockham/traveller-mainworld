@@ -3,7 +3,7 @@
 **Version:** 0.1 (draft)
 **Author:** Geoff Stockham
 **Status:** Draft for review
-**Last updated:** 2 August 2026
+**Last updated:** 4 August 2026
 
 ---
 
@@ -60,10 +60,16 @@ A UPP string like `C867A69-8` encodes Starport, **Size, Atmosphere, Hydrographic
 
 ### 6.1 Input
 
-- **R1.** Accept a full UPP string (with or without hyphen/starport digit); parse and validate hex codes. Invalid input produces a clear inline error, not a broken planet.
+- **R1.** *(Amended 2026-08-04 — see below.)* Accept a UPP in its canonical form, `C867A69-8`: a starport class, six codes, a hyphen, and the Tech Level code. Case is folded and surrounding whitespace is trimmed; **the starport class and the hyphen are both required.** Parse and validate every position. Invalid input produces a clear inline error **naming the offending position**, not a generic message and not a broken planet.
 - **R2.** Accept a seed: any string, hashed internally to a 64-bit value. Blank seed generates a random one and displays it (so it can be recorded).
 - **R3.** "Re-roll seed" control that keeps the UPP and randomises the seed.
 - **R4.** The full input state is round-trippable via URL query parameters, including generator version (see §6.4).
+
+> **Amendment, 2026-08-04 (WP8).** R1 previously read "Accept a full UPP string (with or without hyphen/starport digit)", and the Phase 1 plan additionally allowed a bare Size/Atmo/Hydro form. Both optional spellings are withdrawn: the parser now accepts exactly one shape.
+>
+> The reason is §5's other half. The MVP consumes digits 2–4, but every position is intended to drive generation in later phases, so an input path that lets Starport or Tech Level go missing would have to be tightened later — after share URLs exist (R4), at which point tightening it is a migration rather than an edit. Requiring the full string once is cheaper than accepting a partial one and regretting it.
+>
+> It also buys better errors. With one accepted shape, every rejection can name a position or a structural fault, which is what R1's "clear inline error" is worth in practice; with four accepted shapes, a malformed input is ambiguous between them and the message degrades to a length complaint. The two withdrawn forms are the likeliest mistakes for someone coming from other Traveller tools, so they get their own messages rather than a generic one.
 
 ### 6.2 Ruleset interpretation layer (pluggable)
 
