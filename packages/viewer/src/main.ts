@@ -6,7 +6,7 @@
  * is the whole point of the spike. No textures, no atmosphere, no craters:
  * those are Phase 1 and 2.
  */
-import { DEFAULT_FBM, GEN_VERSION, type World, hashSeedString, tileDepth } from '@traveller-mainworld/core';
+import { GEN_VERSION, tileDepth } from '@traveller-mainworld/core';
 import * as THREE from 'three';
 
 import { bindControls } from './camera/controls.js';
@@ -17,6 +17,7 @@ import { DEFAULT_LOD, type LodParams, selectTiles } from './lod/quadtree.js';
 import { skirtDepthFor } from './mesh/tileMesh.js';
 import { PlanetRenderer, createScene } from './render/planet.js';
 import { TileStore } from './stream/tileStore.js';
+import { chooseWorld } from './world/choice.js';
 
 /** Planet radius in scene units. Everything else is expressed relative to this. */
 const RADIUS = 1;
@@ -33,28 +34,6 @@ const ELEVATION_EXAGGERATION = 30;
 /** Grid resolution per tile. 65² for now; Spike B decides 65 vs 129 on measurement. */
 const TILE_N = 64;
 
-interface WorldChoice {
-  readonly label: string;
-  readonly world: World;
-}
-
-/** A Luna-like airless rockball, as the Phase 0 stand-in. */
-function defaultWorld(seedText: string): WorldChoice {
-  const seed = hashSeedString(seedText);
-  return {
-    label: `Size 8 airless rockball / seed ${seedText}`,
-    world: {
-      spec: {
-        radiusKm: 1737,
-        terrainAmplitudeM: 7000,
-        fbm: { ...DEFAULT_FBM, octaves: 10 },
-      },
-      seedHi: seed[0]!,
-      seedLo: seed[1]!,
-    },
-  };
-}
-
 function main(): void {
   const app = document.querySelector<HTMLDivElement>('#app');
   if (app === null) {
@@ -68,7 +47,17 @@ function main(): void {
   canvas.style.cssText = 'display:block;width:100%;height:100%;outline:none';
   app.appendChild(canvas);
 
-  const { label, world } = defaultWorld(params.get('seed') ?? '42');
+  let choice;
+  try {
+    choice = chooseWorld(params);
+  } catch (error) {
+    // A bad ?fixture= is a typo, not a crash to read out of the console. Say
+    // what was asked for and what exists, on the page.
+    app.textContent = error instanceof Error ? error.message : String(error);
+    app.style.cssText = 'padding:2rem;font:14px/1.6 ui-monospace,monospace;color:#ff8a94';
+    return;
+  }
+  const { label, world } = choice;
 
   const { scene, camera, renderer, sun } = createScene(canvas, {
     preserveDrawingBuffer: params.has('debug'),

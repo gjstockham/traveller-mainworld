@@ -25,6 +25,9 @@ export * from './kernel/cubesphere.js';
 
 // Generation surface.
 export type { PhysicalWorldSpec, World } from './spec.js';
+// The fixture worlds. Here rather than in the golden harness so that the worlds
+// the viewer can fly and the worlds the manifest pins are the same objects.
+export * from './fixtures.js';
 export * from './tile/generator.js';
 
 // The WASM kernel twin (WP3). Marshalling only — no generation arithmetic — so

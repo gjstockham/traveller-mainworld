@@ -63,8 +63,28 @@ wrong in ways the table did not show — see `bench/test/harness.test.ts`.
 craters, but the budget is for a Phase-1 tile, so the pass is modelled at
 representative density outside `packages/core` where it cannot touch a hash.
 
-The viewer takes `?seed=<text>` to change world, and `?debug=1` to preserve the
-WebGL drawing buffer so pixels can be read back.
+The viewer takes `?seed=<text>` to change world, `?debug=1` to preserve the WebGL
+drawing buffer so pixels can be read back, and `?fixture=<id>` to fly one of the
+ten golden fixture worlds:
+
+```
+?fixture=size1-rockball   size2-cinder     size3-ceres      size4-luna
+         size5-mercury    size6-mars       size7-temperate  size8-earthlike
+         size9-large      sizeA-maximal
+```
+
+Those are the same `World` objects `packages/golden/fixtures.json` pins — the
+specs live in `core`, not in the harness, so what you fly is what is hashed
+rather than a copy that could drift. An unknown id is refused with the list
+rather than silently falling back to the default world, and `?seed=` is refused
+alongside `?fixture=` because a fixture's seed is part of what is pinned.
+
+Worth knowing before you look: **terrain relief is exaggerated 30× for display**
+and that factor was calibrated against one world. Relief-to-radius across the
+fixture set spans a factor of forty, so the small end renders as a lumpy potato
+(Size 1 shows ~90% of its radius as relief) while the large end looks like a
+planet. That is a display choice — `ELEVATION_EXAGGERATION` in `main.ts`, which
+cannot touch generated data or a hash — not a property of the worlds.
 
 ## Skirts and seams
 
