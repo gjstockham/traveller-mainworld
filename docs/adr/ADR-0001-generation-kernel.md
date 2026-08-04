@@ -106,9 +106,15 @@ Source: [`docs/evidence/wp4-manual-checks.md`](../evidence/wp4-manual-checks.md)
 | chromium / firefox / webkit | — | GitHub Actions, ubuntu-latest | **not run** |
 | chromium / firefox / webkit | — | GitHub Actions, macos-latest | **not run** |
 | chromium / firefox / webkit | — | GitHub Actions, windows-latest | **not run** |
-| M1 | Real Safari | macOS | **not run** |
-| M2 | Safari | iOS | **not run** |
-| M3 | Chrome | Android | **not run** |
+| M1 | Real Safari | macOS | **not run** — no Mac available |
+| M2 | Safari | iOS | **not run** — untested by choice |
+| M3 | Chrome 150 | Android 10 | **PASS** — `0c6181a0…` / `9843cdd3…` |
+
+*(The table above is as this ADR was written. Since then the nine CI cells have
+run green on three OSes, the Node reference leg with them, and M3 has been
+hand-checked on a real Android device — see the amendment below and the evidence
+file. The original text is left standing rather than rewritten, because what
+this decision was made on is a different question from what is known now.)*
 
 Three engines agree, bit for bit, on **one** operating system. Reading that as
 more than it is would be easy in two specific ways, so both are stated plainly:
@@ -332,6 +338,42 @@ and it is the one E3 cites.
 
 ---
 
+## Amendment, 2026-08-04 — what has been observed since
+
+The evidence above is what this decision was made on. This section is what is
+known now. Nothing here changes the decision; it changes how much of R1 remains.
+
+**Discharged.** All nine `browser-matrix` cells have run green across ubuntu,
+macOS and Windows, on both golden artefacts (WP7 added a fixture manifest to
+every cell). The Node reference leg passed on the same three operating systems,
+and the `build-invariance` cell showed that an unminified bundle and a
+Vite-default bundle reproduce both digests. Twelve cells, four engines counting
+Node, three OSes, identical digests throughout. PRD §9.1 asked for two OSes;
+there are three. The "one operating system" limit named in E1 is gone.
+
+**M3 discharged.** Android 10 / Chrome 150, on a real handset, both digests
+exact — the first result from actual hardware and the first from an Arm CPU.
+
+**M1 and M2 are not discharged, and will not be for now.** No Mac is available
+to the author, and iOS Safari is untested by choice. Recorded here because the
+consequence is specific and easy to lose: **M1 and M2 are both JavaScriptCore,
+so no real JavaScriptCore has ever run this battery.** Every WebKit result in
+the evidence comes from Playwright's build, and this ADR already says why that
+is not the same thing. M3 does not substitute — Android Chrome is V8, the engine
+that was already best covered.
+
+So the shape of the evidence has changed less than the cell count suggests. What
+was "three engines on one OS, run locally" is now "three engines on three OSes in
+CI, plus one real Arm device". What was missing is still missing, and it is the
+engine whose stand-in this document trusts least.
+
+**This ADR therefore remains Provisional.** R1's remaining half is M1 and M2.
+Promoting it now would mean recording that the decision criteria were met when
+they were not — which is the failure this document opens by refusing to commit,
+and it would be no less a failure for being one row closer to true.
+
+---
+
 ## Revisit trigger
 
 Any of these reopens this ADR. R1 additionally gates its status and Phase 0's
@@ -339,7 +381,7 @@ exit.
 
 | # | Trigger | Consequence |
 |---|---|---|
-| **R1** | The nine `browser-matrix` cells run — both golden artefacts, per WP7 — and M1–M3 are hand-checked and recorded in `docs/evidence/wp4-manual-checks.md`. | **All green:** §A.3 row 1 is satisfied, this ADR becomes **Accepted**, and the "provisional" framing is removed. **Any divergence:** §A.3 row 3 selects the WASM kernel on correctness grounds regardless of performance. Record the engine, version, OS, case and both hashes; do not loosen a comparison to make a cell green. |
+| **R1** | ~~The nine `browser-matrix` cells run~~ **(done, green, three OSes, both artefacts)** and M1–M3 are hand-checked. ~~M3~~ **(done, green, Android 10 / Chrome 150)**. **Outstanding: M1 and M2 — real Safari on macOS, and iOS Safari.** | **All green:** §A.3 row 1 is satisfied, this ADR becomes **Accepted**, and the "provisional" framing is removed. **Any divergence:** §A.3 row 3 selects the WASM kernel on correctness grounds regardless of performance. Record the engine, version, OS, case and both hashes; do not loosen a comparison to make a cell green. |
 | **R2** | The `wasm-parity` workflow fails, or has not run in a quarter. | The mutual-parity evidence has expired. Run `pnpm check:parity`, establish whether the twin is stale or the kernel has changed, and repair the twin — it is the only check that two independent implementations agree. |
 | **R3** | A new generator feature needs an operation the whitelist bans, and no polynomial approximation over whitelisted ops is practical. | The whitelist is no longer sufficient to carry the determinism promise, which is the foundation this decision rests on. Reopen. |
 | **R4** | `pnpm bench` shows the 129² Phase-1 tile exceeding 100 ms, or pool throughput below 25 tiles/s, on the minimum target. | §A.3 row 2 applies: WASM on performance grounds. The 2.4× margin is what makes this unlikely, not impossible — Phase 1 adds passes. |

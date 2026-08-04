@@ -285,10 +285,19 @@ banned-method scan covers the rest.
 [ADR-0001](docs/adr/ADR-0001-generation-kernel.md) selected the **TypeScript
 kernel** — provisionally, because six of the nine matrix cells and all three
 manual device checks had not run when it was written. The ADR says so in its own
-words rather than citing evidence that does not exist; filling in
-[the evidence file](docs/evidence/wp4-manual-checks.md) is what promotes it from
-Provisional to Accepted, and a divergence anywhere rewrites it as a WASM decision
-on correctness grounds.
+words rather than citing evidence that does not exist.
+
+Since then all nine cells have run green on three operating systems, on both
+golden artefacts, alongside the Node reference leg and the build-invariance
+cell; and M3 (Android Chrome, real handset) passed. It stays **Provisional**
+anyway, because M1 and M2 remain unrun and both are JavaScriptCore — so **no
+real Safari has ever executed the battery**, and Playwright's WebKit is not
+Safari. That is the one gap left, it is recorded rather than glossed in
+[the evidence file](docs/evidence/wp4-manual-checks.md), and a minute on any
+iPhone or borrowed Mac against
+[the deployed page](https://gjstockham.github.io/traveller-mainworld/verify.html)
+closes it. A divergence anywhere rewrites the ADR as a WASM decision on
+correctness grounds.
 
 So `crates/kernel-wasm` is **archived, not maintained** — see
 [its README](crates/kernel-wasm/README.md). The parity check left the required CI
