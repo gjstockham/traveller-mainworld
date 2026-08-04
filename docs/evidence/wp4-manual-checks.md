@@ -27,10 +27,19 @@ every hash plus both overall digests.
 > **This file gates ADR-0001.** [ADR-0001](../adr/ADR-0001-generation-kernel.md)
 > selected the TypeScript kernel **provisionally**, because when it was written
 > only the three local Ubuntu cells had run and the three manual rows below were
-> empty. Its revisit trigger R1 is precisely this file: filling in the nine CI
-> cells and M1–M3 all green promotes that ADR from Provisional to Accepted, and
-> any divergence rewrites it as a WASM decision on correctness grounds. Phase 0
-> cannot exit until these rows are filled.
+> empty. Its revisit trigger R1 is precisely this file.
+>
+> **Resolved 2026-08-04, and not in the way R1 was written.** The nine CI cells
+> are green on three OSes, M2 is green on real iOS Safari and M3 on a real
+> Android handset. **M1 was never run.** R1 was amended to drop it and the ADR
+> promoted to **Accepted** on the amended criterion — see its
+> [Amendment 2](../adr/ADR-0001-generation-kernel.md#amendment-2-2026-08-04--r1-amended-and-this-adr-promoted),
+> which states what residual is accepted and why. M1's row below stays open, and
+> filling it is still worth a minute on any Mac.
+>
+> **Any divergence, from any source, still rewrites the ADR as a WASM decision on
+> correctness grounds** — that is trigger R6, it is permanent, and the acceptance
+> above rests on it.
 
 > A divergence is a finding, not a bug to be worked around. Per spike plan §A.3
 > it selects the WASM kernel on **correctness** grounds regardless of
@@ -207,6 +216,10 @@ evidence, and "it passed on my phone" is not something an ADR can rest on.
 <!-- M1 -->
 ```
 NOT RUN — real Safari on macOS. No Mac available to the author.
+
+Residual accepted 2026-08-04 by ADR-0001 Amendment 2, which amended R1 to require
+M2 and M3 only. This row is open, not closed: it is no longer a blocker, it is
+still a check worth running, and a divergence here would reopen the ADR under R6.
 ```
 
 <!-- M2 -->
@@ -266,7 +279,7 @@ build           0aefaa8a5dc2a42e92f2d2c5e4076f7debd47cce
 
 | # | Device | OS | Browser | Digest | Result | Date |
 |---|---|---|---|---|---|---|
-| M1 | — | macOS | Safari | — | **not run** — no Mac available | — |
+| M1 | — | macOS | Safari | — | **not run** — no Mac available; residual accepted, ADR-0001 Amendment 2 | — |
 | M2 | iPhone, 393×852 @3, 4 cores | iOS 26.5.2 | **Safari 26.5.2** (`Version/26.5.2`, no shell token) | `0c6181a0…` / `9c0f8603…` | **PASS** (12.8 s) | 2026-08-04 |
 | M2′ | the same iPhone | iOS 26.5.2 | Chrome for iOS (CriOS 150.0.7871.113) — WebKit/JSC, not Safari | `0c6181a0…` / `9c0f8603…` | **PASS** (14.0 s) | 2026-08-04 |
 | M3 | 412×915 @2.625, 8 cores / 8 GB | Android 10 | Chrome 150.0.0.0 | `0c6181a0…` / `9c0f8603…` | **PASS** (264.6 s) | 2026-08-04 |
@@ -325,15 +338,22 @@ grounds that the engine is now covered.
 
 It is, though, a much smaller thing to weigh than it was before M2 ran.
 **Whether ADR-0001 may be promoted on it is a judgement call, not a fact**, and
-R1 as written asks for M1–M3. Amending R1 — on the record, with the reasoning
-that M2 now discharges the JavaScriptCore question and desktop Safari is a
-tiering residual the project accepts — is a legitimate decision. Making it
-quietly, by declaring the criteria met while the row is blank, is the failure
-that ADR opens by refusing to commit. Either the criterion changes on the
-record, or the row gets filled.
+R1 as written asks for M1–M3.
 
-Filling it needs no code and about a minute on any borrowed Mac:
-<https://gjstockham.github.io/traveller-mainworld/verify.html>.
+**That call was made on 2026-08-04: R1 amended to require M2 and M3, the
+desktop-tiering residual accepted by name, and the ADR promoted to Accepted.**
+The reasoning is in [Amendment 2](../adr/ADR-0001-generation-kernel.md#amendment-2-2026-08-04--r1-amended-and-this-adr-promoted)
+and is not repeated here, but its load-bearing part belongs in this file too: the
+kernel is restricted to operations the ECMAScript spec requires to be correctly
+rounded, so a desktop-Safari divergence would be a spec violation in a browser
+rather than an implementation difference the design failed to anticipate. That is
+what makes a JIT-tiering residual narrow rather than open-ended.
+
+**M1's row stays open.** It was dropped as a blocker, not withdrawn as a check —
+running it still needs no code and about a minute on any borrowed Mac:
+<https://gjstockham.github.io/traveller-mainworld/verify.html>. If it is ever run
+and diverges, ADR-0001 R6 applies unchanged and this becomes a WASM decision on
+correctness grounds.
 
 ## If a cell fails
 

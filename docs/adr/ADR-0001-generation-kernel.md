@@ -1,13 +1,21 @@
 # ADR-0001 — Generation kernel: TypeScript or Rust/WASM
 
-**Status:** **Provisional.** Adopted for Phase 0 development; *not* a settled answer to Spike A.
-**Date:** 2026-08-03
+**Status:** **Accepted** — on an **amended R1**. Not on R1 as originally written: M1
+(desktop Safari on macOS) was never run, and [Amendment 2](#amendment-2-2026-08-04--r1-amended-and-this-adr-promoted)
+is where that residual is accepted by name and argued. Read it before citing this
+ADR as settled.
+**Date:** 2026-08-03 · **Accepted:** 2026-08-04
 **Work package:** WP6 (implementation plan §6) · **Spike:** A §A.3
 **Supersedes:** nothing · **Superseded by:** nothing
 
 ---
 
-## What "provisional" means here, and why this ADR opens with it
+## What "provisional" meant here, why this ADR opened with it, and how it ended
+
+*Written 2026-08-03, when the status was Provisional. Left standing in full,
+because the reasoning is the spine of this document and deleting it on promotion
+would destroy the only record of what the promotion had to clear. The closing
+note says how it ended.*
 
 Spike A's decision table (§A.3) turns on whether the TypeScript kernel's hashes
 "match everywhere". **Everywhere has not been observed.** Nine browser CI cells
@@ -15,11 +23,6 @@ exist and none of them has ever run; three hand-checks on real Safari, iOS
 Safari and Android Chrome are specified as non-optional and all three rows are
 empty. What has been observed is three engines on one operating system, run
 locally rather than in CI.
-
-*(That paragraph is the state on 2026-08-03 and is left standing. Nine cells and
-two of the three hand-checks have run green since — see
-[the amendment](#amendment-2026-08-04--what-has-been-observed-since). M1 is
-still empty, which is why the status below has not moved.)*
 
 So this ADR does not report that the decision criteria were met. It reports that
 **no divergence has been found in the evidence gathered so far**, adopts the
@@ -35,6 +38,19 @@ foundation for it. An ADR that recorded "TS wins, evidence: the matrix" while th
 matrix had never run would reintroduce exactly the thing the spike was opened to
 prevent — with a citation attached, which is worse, because a citation stops
 people looking.
+
+> **How it ended, 2026-08-04.** Twelve automated cells green on three OSes, M2
+> green on Apple's own Safari, M3 green on a real Android handset. M1 — desktop
+> Safari on macOS — was never run and no Mac was available.
+>
+> R1 was therefore **amended rather than discharged**, and this ADR promoted on
+> the amended criterion. That is the one move the paragraphs above were written
+> to guard against being made *silently*, so it was made loudly:
+> [Amendment 2](#amendment-2-2026-08-04--r1-amended-and-this-adr-promoted) states
+> what residual is being accepted, why, and what would reopen this. The status
+> line says "on an amended R1" for the same reason. A reader who cites this ADR
+> as evidence that the kernel matches everywhere is still wrong, and the
+> document should keep making that hard.
 
 ---
 
@@ -118,7 +134,8 @@ Source: [`docs/evidence/wp4-manual-checks.md`](../evidence/wp4-manual-checks.md)
 *(The table above is as this ADR was written. Since then the nine CI cells have
 run green on three OSes, the Node reference leg with them, and M2 and M3 have
 been hand-checked — on real iOS Safari and a real Android device respectively —
-see the amendment below and the evidence file. The original text is left
+see the amendments below and the evidence file. M1 never ran; Amendment 2 accepts
+that residual explicitly rather than filling it. The original text is left
 standing rather than rewritten, because what this decision was made on is a
 different question from what is known now.)*
 
@@ -344,7 +361,7 @@ and it is the one E3 cites.
 
 ---
 
-## Amendment, 2026-08-04 — what has been observed since
+## Amendment 1, 2026-08-04 — what has been observed since
 
 The evidence above is what this decision was made on. This section is what is
 known now. Nothing here changes the decision; it changes how much of R1 remains.
@@ -389,20 +406,87 @@ R1 here, on the record, to treat M2 as discharging the JavaScriptCore question
 and accept the desktop-tiering residual by name. The second is legitimate. It has
 not been done, so the status stands.
 
+*(The second route was taken later the same day. See Amendment 2. This section is
+left as written; it is the argument the amendment had to answer.)*
+
+---
+
+## Amendment 2, 2026-08-04 — R1 amended, and this ADR promoted
+
+**Decision: R1 is amended to require M2 and M3, not M1–M3. On the amended
+criterion R1 is discharged, and this ADR is promoted from Provisional to
+Accepted.** Taken by the author, recorded here rather than enacted by editing
+R1's text and moving the status line.
+
+### What is being accepted
+
+M1 — desktop Safari on macOS — has never run and is not scheduled. Every other
+cell in [E1](#e1--cross-platform-determinism-wp4) is green. So the residual being
+accepted is exactly this: **desktop Safari's build configuration and JIT tiers,
+on desktop-class Mac hardware.** Not "Safari"; not "JavaScriptCore"; not "Apple
+hardware" — M2 covers all three.
+
+### Why it is acceptable
+
+1. **The engine question is answered.** Spike A's question is whether the kernel
+   produces bit-identical `Float64` output across engines. The three engine
+   families are V8, SpiderMonkey and JavaScriptCore; all three have now executed
+   the full battery and the full fixture set in a browser their vendor ships or
+   builds, and JavaScriptCore did so on Apple's own hardware in Apple's own
+   browser. No divergence anywhere, in twelve automated cells and two devices.
+2. **The whitelist is the actual guarantee, and it is enforced, not hoped for.**
+   The kernel is restricted to operations the ECMAScript spec requires to be
+   correctly rounded — `+ − × ÷`, `sqrt`, and integer/bitwise work. Those have no
+   licence to vary between builds or JIT tiers of one engine; a divergence would
+   be a spec violation in Safari, not a difference of implementation. That is a
+   materially stronger position than "we tested a lot of things and none broke",
+   and it is what makes the residual narrow rather than open-ended.
+3. **Desktop and iOS Safari are the same JavaScriptCore source line.** They
+   differ in build configuration and JIT tier policy, not in the arithmetic the
+   spec pins down. Tiering *is* the plausible mechanism for a same-engine
+   divergence, which is why this is a residual at all — but it would have to move
+   a correctly-rounded operation to bite, and both tier policies already agree
+   with each other everywhere else measured.
+4. **The cost of holding is real and the benefit is speculative.** Phase 0 exists
+   to retire two project-killing risks. Blocking its exit on borrowing a Mac
+   holds the entire project against a check whose expected information content is
+   now very low — while leaving the ADR Provisional, which makes every downstream
+   document hedge about a decision that is not, in practice, in doubt.
+
+### What is *not* being claimed
+
+This ADR does not claim the TypeScript kernel has been shown to match everywhere.
+It claims no divergence has been found in a body of evidence that now covers
+every engine family on every target OS plus two real devices, and that the
+remaining unmeasured configuration is one whose failure mode would be a browser
+bug rather than a design flaw. §A.3 row 1 is satisfied **as amended**. Anyone
+citing this ADR for the stronger claim is citing it wrongly.
+
+### What reopens it
+
+M1 is not withdrawn as a check — it is withdrawn as a *blocker*. It stays in the
+evidence file as an open row, and running it remains worth a minute on any Mac
+that becomes available. If it is ever run and diverges, R1's divergence clause
+applies unchanged and this becomes a WASM decision on correctness grounds, status
+back to Provisional pending the rewrite. The same holds for any divergence
+reported anywhere, by anyone, on any engine. See R6.
+
 ---
 
 ## Revisit trigger
 
-Any of these reopens this ADR. R1 additionally gates its status and Phase 0's
-exit.
+Any of these reopens this ADR. R1 gated its status and Phase 0's exit and is
+discharged as amended; **R6 is the permanent one** and is what the acceptance in
+Amendment 2 rests on.
 
 | # | Trigger | Consequence |
 |---|---|---|
-| **R1** | ~~The nine `browser-matrix` cells run~~ **(done, green, three OSes, both artefacts)** and M1–M3 are hand-checked. ~~M3~~ **(done, green, Android 10 / Chrome 150)**. ~~M2~~ **(done, green, iOS Safari 26.5.2 — vendor JavaScriptCore)**. **Outstanding: M1 — real Safari on macOS.** | **All green:** §A.3 row 1 is satisfied, this ADR becomes **Accepted**, and the "provisional" framing is removed. **Any divergence:** §A.3 row 3 selects the WASM kernel on correctness grounds regardless of performance. Record the engine, version, OS, case and both hashes; do not loosen a comparison to make a cell green. |
+| **R1** | ~~The nine `browser-matrix` cells run and M1–M3 are hand-checked.~~ **Discharged 2026-08-04 as amended** — twelve cells green on three OSes, M2 green on iOS Safari, M3 green on Android Chrome. **M1 was dropped from this trigger by [Amendment 2](#amendment-2-2026-08-04--r1-amended-and-this-adr-promoted), not satisfied by it.** | ~~All green:~~ §A.3 row 1 is satisfied **as amended**, and this ADR is **Accepted**. Divergence handling moves to R6, which is permanent. |
 | **R2** | The `wasm-parity` workflow fails, or has not run in a quarter. | The mutual-parity evidence has expired. Run `pnpm check:parity`, establish whether the twin is stale or the kernel has changed, and repair the twin — it is the only check that two independent implementations agree. |
 | **R3** | A new generator feature needs an operation the whitelist bans, and no polynomial approximation over whitelisted ops is practical. | The whitelist is no longer sufficient to carry the determinism promise, which is the foundation this decision rests on. Reopen. |
 | **R4** | `pnpm bench` shows the 129² Phase-1 tile exceeding 100 ms, or pool throughput below 25 tiles/s, on the minimum target. | §A.3 row 2 applies: WASM on performance grounds. The 2.4× margin is what makes this unlikely, not impossible — Phase 1 adds passes. |
 | **R5** | A target engine is added (a new browser, a native or server-side runtime). | The matrix's coverage claim no longer matches the target set. Extend `browser-matrix` and re-run before relying on this decision. |
+| **R6** | **Any** hash divergence is observed anywhere — a matrix cell, a hand-check, a user report, or M1 if it is ever run. | §A.3 row 3 selects the WASM kernel on **correctness** grounds regardless of performance. Status returns to **Provisional** pending the rewrite. Record the engine, version, OS, case and both hashes; do not loosen a comparison to make a cell green. This trigger does not expire, and R1 being discharged does not weaken it — it is the reason accepting M1's residual is safe rather than merely convenient. |
 
 ---
 

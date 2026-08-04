@@ -327,25 +327,32 @@ banned-method scan covers the rest.
 ## The kernel decision
 
 [ADR-0001](docs/adr/ADR-0001-generation-kernel.md) selected the **TypeScript
-kernel** — provisionally, because six of the nine matrix cells and all three
-manual device checks had not run when it was written. The ADR says so in its own
-words rather than citing evidence that does not exist.
+kernel** — provisionally at first, because six of the nine matrix cells and all
+three manual device checks had not run when it was written. The ADR said so in
+its own words rather than citing evidence that did not exist.
 
-Since then all nine cells have run green on three operating systems, on both
-golden artefacts, alongside the Node reference leg and the build-invariance
-cell; M3 (Android Chrome, real handset) passed; and **M2 passed on real iOS
-Safari**, which is the first time an engine Apple ships has executed this
-battery — every WebKit result before it came from Playwright's build, and that
-is not the same thing.
+All nine cells have since run green on three operating systems, on both golden
+artefacts, alongside the Node reference leg and the build-invariance cell; M3
+(Android Chrome, real handset) passed; and **M2 passed on real iOS Safari** — the
+first time an engine Apple ships has executed this battery, every WebKit result
+before it having come from Playwright's build, which is not the same thing.
 
-It stays **Provisional** anyway, because M1 — desktop Safari on macOS — is still
-unrun and R1 asks for all three. The residual is narrow and named rather than
-glossed in [the evidence file](docs/evidence/wp4-manual-checks.md): the engine
-question is answered, what is left is desktop Safari's build and JIT tiers on
-desktop-class hardware. A minute on any borrowed Mac against
+The ADR is now **Accepted, on an amended R1**. M1 — desktop Safari on macOS —
+never ran, so rather than declare the criteria met, R1 was amended to drop it and
+the residual accepted by name in
+[Amendment 2](docs/adr/ADR-0001-generation-kernel.md#amendment-2-2026-08-04--r1-amended-and-this-adr-promoted):
+the engine question is answered on all three engine families, and what is left is
+desktop Safari's build and JIT tiers on desktop-class hardware. That residual is
+narrow for a reason worth knowing — the kernel uses only operations the
+ECMAScript spec requires to be correctly rounded, so a divergence there would be
+a browser bug rather than a design flaw.
+
+M1's row stays open in [the evidence file](docs/evidence/wp4-manual-checks.md)
+and a minute on any borrowed Mac against
 [the deployed page](https://gjstockham.github.io/traveller-mainworld/verify.html)
-closes it; amending R1 on the record is the other honest route. A divergence
-anywhere rewrites the ADR as a WASM decision on correctness grounds.
+still fills it. **A divergence anywhere, from any source, rewrites the ADR as a
+WASM decision on correctness grounds** — trigger R6, which is permanent and is
+what the acceptance rests on.
 
 So `crates/kernel-wasm` is **archived, not maintained** — see
 [its README](crates/kernel-wasm/README.md). The parity check left the required CI

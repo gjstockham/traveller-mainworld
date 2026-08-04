@@ -116,7 +116,7 @@ Total ≈ 17–23 sessions. The long pole is Spike C, which is also the most fun
 
 | Risk | Handling |
 |------|----------|
-| Playwright WebKit ≠ real Safari | Treat Playwright as smoke test; manual real-Safari + iOS spot-checks are part of Spike A's exit, not optional. |
+| Playwright WebKit ≠ real Safari | Treat Playwright as smoke test; manual real-Safari + iOS spot-checks are part of Spike A's exit, not optional. **Amended 2026-08-04:** iOS Safari and Android Chrome ran green; **desktop Safari on macOS never ran**, and that residual was accepted rather than filled — reasoning in [ADR-0001 Amendment 2](../adr/ADR-0001-generation-kernel.md#amendment-2-2026-08-04--r1-amended-and-this-adr-promoted). The "not optional" above is what the amendment had to argue past; it is left standing for that reason. |
 | Denormal handling differences | Spec says IEEE-conformant, so low risk — but the test battery includes denormal inputs precisely because "low risk" isn't zero for a forever-promise. |
 | WASM build/toolchain friction (Rust, wasm-pack) in a TS project | Contained: the WASM twin is one crate with a thin JS binding; if the TS kernel wins, the crate is archived, not maintained. |
 | Skirt artefacts at grazing light angles | Known trade-off; acceptable for Phase 0/1 flat shading. Re-evaluate when Phase 2 adds water edges and scattering. |
