@@ -210,74 +210,87 @@ NOT RUN — real Safari on macOS. No Mac available to the author.
 
 <!-- M2 -->
 ```
-NOT RUN — iOS Safari. Not tested; expected to pass, on the reasoning that it is
-the same JavaScriptCore family as M1 and that no divergence has been seen
-anywhere. That expectation is not evidence, and this file does not record it as
-any.
+result          PASS
+generator       0.1.0
+manifest        0.1.0 (digest 0c6181a006c94e6173d93e842a77736015f7ccf49cdb6a3abf707ad47f08bdf7)
+battery         full — 21 cases
+battery digest  0c6181a006c94e6173d93e842a77736015f7ccf49cdb6a3abf707ad47f08bdf7
+fixture set     289a78e59ada7f5bab4a7c26c99ae5af580b9e95fbcdca033dd02f499e0c701c (manifest 289a78e59ada7f5bab4a7c26c99ae5af580b9e95fbcdca033dd02f499e0c701c)
+fixtures        full — 10 worlds
+fixture digest  9c0f860316158247bfd1d58523cb8212b3b0faef6cd8cbb4f46265c9f9217387 (expected 9c0f860316158247bfd1d58523cb8212b3b0faef6cd8cbb4f46265c9f9217387)
+duration        14.0 s across 4 worker(s)
+user agent      Mozilla/5.0 (iPhone; CPU iPhone OS 26_5_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/150.0.7871.113 Mobile/15E148 Safari/604.1
+hardware        cores 4, memory not reported
+screen          393×852 @ 3
+run at          2026-08-04T12:45:41.996Z
+build           0aefaa8a5dc2a42e92f2d2c5e4076f7debd47cce
 ```
 
 <!-- M3 -->
-> **Superseded — needs re-running.** The fixture specs were retuned against real
-> solar-system bodies (see the CHANGELOG entry for fixture set
-> `289a78e59ada7f5b…`), so the fixture digest below no longer exists. The battery
-> half of this block is still valid; the fixture half is not. About a minute on
-> the same device to replace it.
-
 ```
 result          PASS
 generator       0.1.0
 manifest        0.1.0 (digest 0c6181a006c94e6173d93e842a77736015f7ccf49cdb6a3abf707ad47f08bdf7)
 battery         full — 21 cases
 battery digest  0c6181a006c94e6173d93e842a77736015f7ccf49cdb6a3abf707ad47f08bdf7
-fixture set     3ed32303b19de99ab3d80f17f46488579c78f3846c3928772f1aa511713dba50 (manifest 3ed32303b19de99ab3d80f17f46488579c78f3846c3928772f1aa511713dba50)
+fixture set     289a78e59ada7f5bab4a7c26c99ae5af580b9e95fbcdca033dd02f499e0c701c (manifest 289a78e59ada7f5bab4a7c26c99ae5af580b9e95fbcdca033dd02f499e0c701c)
 fixtures        full — 10 worlds
-fixture digest  9843cdd31cf52ced1862d927638ff5e1eaf338c4cdcfa9757cca0c61bee5033d (expected 9843cdd31cf52ced1862d927638ff5e1eaf338c4cdcfa9757cca0c61bee5033d)
-duration        28.0 s across 4 worker(s)
+fixture digest  9c0f860316158247bfd1d58523cb8212b3b0faef6cd8cbb4f46265c9f9217387 (expected 9c0f860316158247bfd1d58523cb8212b3b0faef6cd8cbb4f46265c9f9217387)
+duration        264.6 s across 4 worker(s)
 user agent      Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36
 hardware        cores 8, memory 8 GB
 screen          412×915 @ 2.625
-run at          2026-08-04T09:14:34.937Z
-build           d65a07a85629aa0b1295bff91cc0bd09d025841f
+run at          2026-08-04T12:46:58.228Z
+build           0aefaa8a5dc2a42e92f2d2c5e4076f7debd47cce
 ```
 
 | # | Device | OS | Browser | Digest | Result | Date |
 |---|---|---|---|---|---|---|
 | M1 | — | macOS | Safari | — | **not run** — no Mac available | — |
-| M2 | — | iOS | Safari | — | **not run** — untested by choice | — |
-| M3 | 412×915 @2.625, 8 cores / 8 GB | Android 10 | Chrome 150.0.0.0 | `0c6181a0…` / ~~`9843cdd3…`~~ | **battery PASS, fixture half superseded** (28.0 s) | 2026-08-04 |
+| M2 | iPhone, 393×852 @3, 4 cores | iOS 26.5.2 | **Chrome for iOS** (CriOS 150.0.7871.113) — WebKit/JSC, *not* Safari | `0c6181a0…` / `9c0f8603…` | **PASS** (14.0 s) | 2026-08-04 |
+| M3 | 412×915 @2.625, 8 cores / 8 GB | Android 10 | Chrome 150.0.0.0 | `0c6181a0…` / `9c0f8603…` | **PASS** (264.6 s) | 2026-08-04 |
 
-### What M3 adds, and what M1 and M2 leaving empty costs
+### What M2 and M3 establish, and what M1 leaving empty still costs
 
-**M3 adds real hardware and a real mobile thermal profile on Arm**, from a build
-whose commit it names (`d65a07a…`). That is the first result from an actual
-device rather than a CI runner, and the first from an Arm CPU. *Its fixture half
-was superseded the same day by a fixture-spec retune; the battery half stands,
-and re-running it is a minute's work.*
+**M2 is the important one, and it is not quite what its row heading says.** It
+was run in **Chrome for iOS**, not Safari. That distinction is worth keeping
+because it cuts both ways:
 
-It does **not** broaden engine coverage. Android Chrome is V8, and V8 was
-already the best-covered engine here — the Node reference leg on three OSes plus
-three chromium cells. M3 says V8 on Arm agrees with V8 on x86-64, which is worth
-knowing and is not the question M1–M3 were written to answer.
+- Every browser on iOS is a WebKit shell over Apple's JavaScriptCore, so this
+  *is* real JSC executing on real Apple hardware. **The battery has now been run
+  on a genuine JavaScriptCore for the first time**, and it agreed exactly. That
+  was the single largest gap in this file and it is closed.
+- It is still not Safari. Safari and a `WKWebView` host share an engine but not
+  a build configuration, and this whole section exists because "close enough to
+  Safari" is precisely the reasoning it refuses to accept. The row says CriOS
+  because that is what the device reported.
 
-**The question they were written to answer is still open.** M1 and M2 are both
-JavaScriptCore, and with both unrun **no real JavaScriptCore has ever executed
-this battery**. The only WebKit results anywhere in this file come from
-Playwright's build, and the whole reason these three rows exist is that
-Playwright's WebKit is not Safari: different build configuration, different JIT
-tiers, different release cadence, and Apple ships the only WebKit anyone
-actually browses with. The engine with the weakest stand-in is the engine with
-no real-hardware coverage at all.
+**M3 adds real hardware and an Arm mobile thermal profile.** It does not broaden
+engine coverage: Android Chrome is V8, already the best-covered engine here via
+the Node leg on three OSes plus three chromium cells. M3 says V8-on-Arm agrees
+with V8-on-x86-64.
 
-So the position is: eleven of twelve automated cells' worth of confidence, one
-real device, and a deliberate, recorded gap over Safari. Development continues
-on that basis. **ADR-0001 stays Provisional** — its R1 is not discharged, and
-promoting it would mean citing evidence that does not exist, which is the
-specific failure that ADR was written to avoid.
+*Timing note, not a finding:* M3 took 264.6 s against 28.0 s for the same device
+on an earlier build, while M2 on the phone took 14.0 s. Nothing between those
+builds touches the verification page, so this is almost certainly thermal
+throttling or background contention on the handset. The hashes matched exactly,
+which is what the cell is for.
 
-Closing it later is cheap and needs no code: the page is live at
-<https://gjstockham.github.io/traveller-mainworld/verify.html>, so M2 is about a
-minute on any iPhone and M1 a minute on any borrowed Mac. Paste the block, fill
-the row, and R1 is discharged.
+**What remains.** M1 — real Safari on macOS — is still unrun, and no Mac is
+available. Its marginal value is now much smaller than it was this morning:
+JavaScriptCore itself has been exercised on Apple silicon by M2, and Playwright's
+WebKit passed on `macos-latest` in CI. What M1 would add is desktop Safari's
+specific build and JIT tiers, on a machine class nothing else here covers.
+
+That is a real residual, and it is small. **Whether ADR-0001 may be promoted on
+it is a judgement call, not a fact**, and R1 as written asks for M1–M3. Amending
+R1 to treat M2 as discharging the JavaScriptCore question is a legitimate
+decision; making it quietly, by declaring the criteria met when the row is
+blank, is the failure that ADR opens by refusing to commit. Either the criterion
+changes on the record, or the row gets filled.
+
+Filling it needs no code and about a minute on any borrowed Mac:
+<https://gjstockham.github.io/traveller-mainworld/verify.html>.
 
 ## If a cell fails
 
