@@ -18,7 +18,8 @@ import type { PhysicalWorldSpec } from '@traveller-mainworld/core';
  *
  * So the exaggeration compresses rather than flattens. Displayed relief follows
  * the **square root** of true relief-to-radius, anchored so an Earth-like world
- * shows {@link DISPLAY_RELIEF_AT_REFERENCE} of its radius:
+ * shows {@link DISPLAY_RELIEF_AT_REFERENCE} of its radius — the figure the old
+ * flat multiplier already produced for such a world:
  *
  * ```
  * displayed = DISPLAY_RELIEF_AT_REFERENCE · √(ratio / REFERENCE_RATIO)
@@ -31,8 +32,10 @@ import type { PhysicalWorldSpec } from '@traveller-mainworld/core';
  * small world rougher — about 3× across the set instead of 8× — while nothing
  * ends up non-spherical.
  *
- * At the anchor this yields roughly the old 30×, so an Earth-like world looks
- * as it always did.
+ * At the anchor this yields about 11×, which sounds like a large change from the
+ * old 30× and is not: the fixture specs were retuned in the same commit, and
+ * 11× on the new relief lands within a whisker of 30× on the old. An Earth-like
+ * world looks as it always did; the small ones stop being potatoes.
  *
  * **This is a display choice and cannot reach a golden hash.** Elevation data
  * is generated in metres by `core` and scaled here, in the renderer, on its way
@@ -48,8 +51,18 @@ import type { PhysicalWorldSpec } from '@traveller-mainworld/core';
  */
 export const REFERENCE_RELIEF_RATIO = 0.003125;
 
-/** Displayed peak-to-trough relief, as a fraction of radius, at the anchor. */
-export const DISPLAY_RELIEF_AT_REFERENCE = 0.1;
+/**
+ * Displayed peak-to-trough relief, as a fraction of radius, at the anchor.
+ *
+ * 3.5% is not a taste call, it is the figure that was already known to look
+ * right: the old flat 30× multiplier put the previous `size8-earthlike` at 3.8%
+ * of its radius, and that world read as a planet. An earlier attempt at this
+ * anchored on 10%, which fixed the small end and made the large end 2.7× bumpier
+ * than it had been — a limb that visibly departs from a circle at every size.
+ * Anchoring on the value that already worked keeps the familiar look and leaves
+ * only the compression to argue about.
+ */
+export const DISPLAY_RELIEF_AT_REFERENCE = 0.035;
 
 /** True peak-to-trough relief as a fraction of radius. */
 export function reliefRatio(spec: PhysicalWorldSpec): number {

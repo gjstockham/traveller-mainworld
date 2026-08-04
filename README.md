@@ -83,12 +83,14 @@ rather than a copy that could drift. An unknown id is refused with the list
 rather than silently falling back to the default world, and `?seed=` is refused
 alongside `?fixture=` because a fixture's seed is part of what is pinned.
 
-Worth knowing before you look: **terrain relief is exaggerated 30× for display**
-and that factor was calibrated against one world. Relief-to-radius across the
-fixture set spans a factor of forty, so the small end renders as a lumpy potato
-(Size 1 shows ~90% of its radius as relief) while the large end looks like a
-planet. That is a display choice — `ELEVATION_EXAGGERATION` in `main.ts`, which
-cannot touch generated data or a hash — not a property of the worlds.
+Terrain relief is exaggerated for display, because true relief is invisible at
+planetary scale — Earth's entire range, Marianas to Everest, is 0.31% of its
+radius. `render/exaggeration.ts` scales displayed relief with the square root of
+true relief-to-radius, anchored so an Earth-like world shows 3.5% of its radius:
+enough to see mountains, little enough that the limb stays a circle. Across the
+set that runs 2.9% to 8.3%, so a small world still reads as rougher without any
+of them turning into an asteroid. It is a display choice and cannot touch
+generated data or a hash.
 
 ## Skirts and seams
 

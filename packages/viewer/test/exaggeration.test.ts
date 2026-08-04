@@ -28,8 +28,12 @@ describe('display exaggeration', () => {
     expect(displayedReliefFraction(earth)).toBeCloseTo(DISPLAY_RELIEF_AT_REFERENCE, 6);
   });
 
-  it('is about 30x at the anchor, so the familiar look is unchanged', () => {
-    expect(effectiveExaggeration(spec(6400, 20_000))).toBeCloseTo(32, 0);
+  it('lands an Earth-like world where the old flat multiplier put it', () => {
+    // The old 30× on the old 8 km relief gave 3.75% of radius, and that looked
+    // like a planet. The new relief is 20 km, so the multiplier is smaller while
+    // the displayed result is the same — which is the property that matters.
+    const oldLook = (30 * 8_000) / 6_400_000;
+    expect(displayedReliefFraction(spec(6400, 20_000))).toBeCloseTo(oldLook, 2);
   });
 
   it('converts metres to scene units where the radius is 1', () => {
@@ -44,7 +48,9 @@ describe('display exaggeration', () => {
     // well under the radius. The old flat 30x put Size 1 at 90%.
     for (const f of FIXTURES) {
       const displayed = displayedReliefFraction(f.world.spec);
-      expect(displayed, `${f.id} displayed relief`).toBeLessThan(0.3);
+      // 10% of radius is already a visibly non-circular limb; a first attempt
+      // at this sat at 23.7% for Size 1 and was rejected on sight.
+      expect(displayed, `${f.id} displayed relief`).toBeLessThan(0.1);
       expect(displayed, `${f.id} displayed relief`).toBeGreaterThan(0.02);
     }
   });
