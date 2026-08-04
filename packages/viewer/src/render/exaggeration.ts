@@ -1,68 +1,40 @@
 import type { PhysicalWorldSpec } from '@traveller-mainworld/core';
 
 /**
- * How much to exaggerate terrain relief for display.
+ * How much to exaggerate terrain relief for display. By default: not at all.
  *
- * True relief is invisible at planetary scale — Earth's entire range, Marianas
- * to Everest, is 0.31% of its radius — so every planet renderer exaggerates.
- * This one used a flat 30× multiplier, which was fine because it was only ever
- * pointed at one hardcoded world.
+ * Real planets are, geometrically, spheres. Earth's entire topographic range —
+ * Marianas Trench to Everest — is 0.31% of its radius, and a photograph from
+ * orbit shows a perfectly circular limb. Everything visible on Luna or Mars from
+ * space comes from albedo and from shading at low sun angles, not from a
+ * silhouette that departs from a circle. A renderer that displaces geometry
+ * enough to be obvious has stopped looking like a photograph and started looking
+ * like a relief globe.
  *
- * Across the fixture set it is not fine. Relief-to-radius spans a factor of
- * eight, so a flat multiplier spans the same factor in *displayed* relief: the
- * large worlds looked like planets and the small ones like Vesta. Real bodies
- * do not work that way. The hydrostatic-equilibrium threshold sits near 200-300
- * km of radius, well below Cepheus Size 1, so every world this product renders
- * should be visibly round. Only Size 0 — a separate generator, explicitly out of
- * scope — is potato territory.
+ * This viewer used a flat 30×, then briefly a square-root compression anchored
+ * at 3.5% of radius. Both were attempts to make terrain legible through
+ * geometry, and both make a large world look rockier than it is — the opposite
+ * of the goal. So the default is now **1×: true scale**.
  *
- * So the exaggeration compresses rather than flattens. Displayed relief follows
- * the **square root** of true relief-to-radius, anchored so an Earth-like world
- * shows {@link DISPLAY_RELIEF_AT_REFERENCE} of its radius — the figure the old
- * flat multiplier already produced for such a world:
+ * The consequence is worth stating plainly rather than discovering: at true
+ * scale these worlds are nearly featureless. Almost everything currently visible
+ * on them is displacement, because the things that give a real body its face
+ * have not been built yet — craters (Phase 1), albedo tracking geology rather
+ * than elevation bands (Phase 4), and shading computed from the true elevation
+ * gradient at full resolution. Photorealism is those, not a multiplier.
  *
- * ```
- * displayed = DISPLAY_RELIEF_AT_REFERENCE · √(ratio / REFERENCE_RATIO)
- * ```
+ * `?exaggeration=<n>` overrides it, for looking at terrain that true scale
+ * hides. That is an inspection tool, not a display default.
  *
- * A flat multiplier would keep the differences and the potatoes. A constant
- * displayed relief would fix the potatoes and throw the differences away, which
- * would contradict the PRD's requirement that Size be *visibly* legible (§6.2:
- * "Size 8+: subdued relief relative to radius"). The square root keeps a rougher
- * small world rougher — about 3× across the set instead of 8× — while nothing
- * ends up non-spherical.
- *
- * At the anchor this yields about 11×, which sounds like a large change from the
- * old 30× and is not: the fixture specs were retuned in the same commit, and
- * 11× on the new relief lands within a whisker of 30× on the old. An Earth-like
- * world looks as it always did; the small ones stop being potatoes.
- *
- * **This is a display choice and cannot reach a golden hash.** Elevation data
- * is generated in metres by `core` and scaled here, in the renderer, on its way
- * to a vertex buffer.
+ * **This is a display choice and cannot reach a golden hash.** Elevation is
+ * generated in metres by `core` and scaled here, on its way to a vertex buffer.
  */
 
-/**
- * The anchor: 20 km of relief on a 6400 km radius, i.e. 0.3125%.
- *
- * That is `size8-earthlike` exactly, and Earth to two significant figures —
- * Earth's own figure is 0.314% (20 km on 6371 km). The round number is chosen
- * so the constant is exact rather than a truncated measurement.
- */
-export const REFERENCE_RELIEF_RATIO = 0.003125;
+/** True scale. A photograph of a planet has no vertical exaggeration. */
+export const DEFAULT_EXAGGERATION = 1;
 
-/**
- * Displayed peak-to-trough relief, as a fraction of radius, at the anchor.
- *
- * 3.5% is not a taste call, it is the figure that was already known to look
- * right: the old flat 30× multiplier put the previous `size8-earthlike` at 3.8%
- * of its radius, and that world read as a planet. An earlier attempt at this
- * anchored on 10%, which fixed the small end and made the large end 2.7× bumpier
- * than it had been — a limb that visibly departs from a circle at every size.
- * Anchoring on the value that already worked keeps the familiar look and leaves
- * only the compression to argue about.
- */
-export const DISPLAY_RELIEF_AT_REFERENCE = 0.035;
+/** Guard rail for `?exaggeration=`; the mesh self-intersects well before this. */
+export const MAX_EXAGGERATION = 200;
 
 /** True peak-to-trough relief as a fraction of radius. */
 export function reliefRatio(spec: PhysicalWorldSpec): number {
@@ -70,29 +42,51 @@ export function reliefRatio(spec: PhysicalWorldSpec): number {
 }
 
 /** Displayed peak-to-trough relief, as a fraction of radius. */
-export function displayedReliefFraction(spec: PhysicalWorldSpec): number {
-  const ratio = reliefRatio(spec);
-  if (ratio <= 0) {
-    return 0;
-  }
-  return DISPLAY_RELIEF_AT_REFERENCE * Math.sqrt(ratio / REFERENCE_RELIEF_RATIO);
+export function displayedReliefFraction(
+  spec: PhysicalWorldSpec,
+  exaggeration = DEFAULT_EXAGGERATION,
+): number {
+  return reliefRatio(spec) * exaggeration;
 }
 
 /**
  * Metres of generated elevation to scene units, with the planet radius as 1.
  *
  * This is what the tile mesh multiplies raw elevation by, and what skirt depth
- * is derived from.
+ * derives from — so at true scale the skirts shrink with it, which is right: a
+ * crack between LOD levels is proportional to the displacement that opens it.
  */
-export function elevationScaleFor(spec: PhysicalWorldSpec): number {
-  if (spec.terrainAmplitudeM <= 0) {
+export function elevationScaleFor(
+  spec: PhysicalWorldSpec,
+  exaggeration = DEFAULT_EXAGGERATION,
+): number {
+  if (spec.radiusKm <= 0) {
     return 0;
   }
-  return displayedReliefFraction(spec) / spec.terrainAmplitudeM;
+  return exaggeration / (spec.radiusKm * 1000);
 }
 
-/** The effective multiplier, for the diagnostics overlay and for tests. */
-export function effectiveExaggeration(spec: PhysicalWorldSpec): number {
-  const ratio = reliefRatio(spec);
-  return ratio <= 0 ? 0 : displayedReliefFraction(spec) / ratio;
+/**
+ * Read `?exaggeration=` from a query string.
+ *
+ * Nothing is rejected silently: a value that is not a positive finite number, or
+ * is beyond {@link MAX_EXAGGERATION}, throws rather than being quietly clamped,
+ * because a silently-ignored display override is how someone concludes the
+ * terrain is flat when they simply mistyped.
+ */
+export function exaggerationFrom(params: URLSearchParams): number {
+  const raw = params.get('exaggeration');
+  if (raw === null) {
+    return DEFAULT_EXAGGERATION;
+  }
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`?exaggeration=${raw} must be a positive number`);
+  }
+  if (value > MAX_EXAGGERATION) {
+    throw new Error(
+      `?exaggeration=${raw} exceeds ${String(MAX_EXAGGERATION)}; the mesh self-intersects long before that`,
+    );
+  }
+  return value;
 }

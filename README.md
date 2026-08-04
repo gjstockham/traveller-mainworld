@@ -91,14 +91,24 @@ every world identical on screen and left the only evidence of scale in the
 overlay readout — throwing away the one thing a space-to-surface zoom exists to
 convey. Zoom does the rest.
 
-Terrain relief is exaggerated for display, because true relief is invisible at
-planetary scale — Earth's entire range, Marianas to Everest, is 0.31% of its
-radius. `render/exaggeration.ts` scales displayed relief with the square root of
-true relief-to-radius, anchored so an Earth-like world shows 3.5% of its radius:
-enough to see mountains, little enough that the limb stays a circle. Across the
-set that runs 2.9% to 8.3%, so a small world still reads as rougher without any
-of them turning into an asteroid. It is a display choice and cannot touch
-generated data or a hash.
+**Terrain is rendered at true scale — no vertical exaggeration.** Real planets
+are geometrically spheres: Earth's entire range, Marianas to Everest, is 0.31%
+of its radius, and a photograph from orbit shows a perfectly circular limb.
+Everything visible on Luna or Mars from space is albedo and low-sun shading, not
+a departure from a circle. Earlier settings here (a flat 30×, then a square-root
+compression at 3.5% of radius) made large worlds look rockier than they are,
+which is the opposite of the goal.
+
+`?exaggeration=<n>` overrides it for inspecting terrain that true scale hides —
+an inspection tool, not a display default. It is a display choice either way and
+cannot touch generated data or a hash.
+
+What this exposes is that almost everything currently visible on these worlds
+was displacement. At true scale they are smooth spheres with four hard-edged
+albedo bands, because the things that give a real body its face are not built
+yet: craters (Phase 1), albedo that tracks geology rather than elevation
+(Phase 4), and shading from the true elevation gradient at full resolution.
+Photorealism is those, not a multiplier.
 
 ## Skirts and seams
 

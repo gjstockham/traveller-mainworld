@@ -2,11 +2,11 @@ import { FIXTURES, type PhysicalWorldSpec } from '@traveller-mainworld/core';
 import { describe, expect, it } from 'vitest';
 
 import {
-  DISPLAY_RELIEF_AT_REFERENCE,
-  REFERENCE_RELIEF_RATIO,
+  DEFAULT_EXAGGERATION,
+  MAX_EXAGGERATION,
   displayedReliefFraction,
-  effectiveExaggeration,
   elevationScaleFor,
+  exaggerationFrom,
   reliefRatio,
 } from '../src/render/exaggeration.js';
 
@@ -16,77 +16,58 @@ const spec = (radiusKm: number, terrainAmplitudeM: number): PhysicalWorldSpec =>
   fbm: { octaves: 8, frequency: 1.6, amplitude: 1, lacunarity: 2, gain: 0.5 },
 });
 
+const q = (search: string): URLSearchParams => new URLSearchParams(search);
+
 describe('display exaggeration', () => {
-  it('shows an Earth-like world at the anchor fraction', () => {
-    // 20 km on 6400 km is 0.3125% — size8-earthlike, and Earth to two
-    // significant figures. Earth's own 6371 km gives 0.314%, which is why the
-    // anchor is the round number and not the measurement.
+  it('defaults to true scale', () => {
+    // A photograph of a planet has no vertical exaggeration. Anything above 1
+    // makes a large world look rockier than it is.
+    expect(DEFAULT_EXAGGERATION).toBe(1);
     const earth = spec(6400, 20_000);
-    expect(reliefRatio(earth)).toBe(REFERENCE_RELIEF_RATIO);
-    // And real Earth is within a hair of it, which is the point of the anchor.
-    expect(reliefRatio(spec(6371, 20_000))).toBeCloseTo(REFERENCE_RELIEF_RATIO, 4);
-    expect(displayedReliefFraction(earth)).toBeCloseTo(DISPLAY_RELIEF_AT_REFERENCE, 6);
+    expect(displayedReliefFraction(earth)).toBe(reliefRatio(earth));
   });
 
-  it('lands an Earth-like world where the old flat multiplier put it', () => {
-    // The old 30× on the old 8 km relief gave 3.75% of radius, and that looked
-    // like a planet. The new relief is 20 km, so the multiplier is smaller while
-    // the displayed result is the same — which is the property that matters.
-    const oldLook = (30 * 8_000) / 6_400_000;
-    expect(displayedReliefFraction(spec(6400, 20_000))).toBeCloseTo(oldLook, 2);
+  it('leaves every fixture geometrically a sphere', () => {
+    // Earth departs from a circle by 0.31% of its radius and photographs as a
+    // perfect disc. At true scale ours do too. The previous settings put Size 1
+    // at 90%, then 23.7%, then 8.3% - all of them visibly not a circle.
+    for (const f of FIXTURES) {
+      expect(displayedReliefFraction(f.world.spec), f.id).toBeLessThan(0.02);
+    }
   });
 
   it('converts metres to scene units where the radius is 1', () => {
     const s = spec(6400, 20_000);
-    expect(elevationScaleFor(s) * 20_000).toBeCloseTo(displayedReliefFraction(s), 9);
+    expect(elevationScaleFor(s) * 20_000).toBeCloseTo(displayedReliefFraction(s), 12);
+    // 20 km on a 6400 km radius really is 0.3125% of it.
+    expect(displayedReliefFraction(s)).toBeCloseTo(0.003125, 9);
   });
 
-  it('keeps every fixture visibly round', () => {
-    // The whole point. A body only departs from a sphere below the hydrostatic
-    // threshold, ~200-300 km of radius — Size 0, and out of scope. Anything this
-    // product renders should read as a planet, so displayed relief has to stay
-    // well under the radius. The old flat 30x put Size 1 at 90%.
-    for (const f of FIXTURES) {
-      const displayed = displayedReliefFraction(f.world.spec);
-      // 10% of radius is already a visibly non-circular limb; a first attempt
-      // at this sat at 23.7% for Size 1 and was rejected on sight.
-      expect(displayed, `${f.id} displayed relief`).toBeLessThan(0.1);
-      expect(displayed, `${f.id} displayed relief`).toBeGreaterThan(0.02);
-    }
+  it('scales linearly with the override', () => {
+    const s = spec(6400, 20_000);
+    expect(elevationScaleFor(s, 10)).toBeCloseTo(elevationScaleFor(s, 1) * 10, 12);
+    expect(displayedReliefFraction(s, 30)).toBeCloseTo(reliefRatio(s) * 30, 12);
   });
 
-  it('still lets size be read off the surface', () => {
-    // Compressing must not flatten. PRD §6.2 wants Size legible — "Size 8+:
-    // subdued relief relative to radius" — so a small world must still look
-    // rougher than a large one, just not lumpy.
-    const smallest = displayedReliefFraction(FIXTURES[0]!.world.spec);
-    const largest = displayedReliefFraction(FIXTURES.at(-1)!.world.spec);
-    expect(smallest / largest).toBeGreaterThan(2);
-    expect(smallest / largest).toBeLessThan(5);
+  it('reads the override off the query string', () => {
+    expect(exaggerationFrom(q(''))).toBe(DEFAULT_EXAGGERATION);
+    expect(exaggerationFrom(q('?exaggeration=12'))).toBe(12);
+    expect(exaggerationFrom(q('?exaggeration=0.5'))).toBe(0.5);
   });
 
-  it('compresses rather than preserving or flattening the spread', () => {
-    // The square root is the whole design. A flat multiplier would reproduce
-    // the true spread (potatoes); a constant fraction would erase it.
-    const ratios = FIXTURES.map((f) => reliefRatio(f.world.spec));
-    const trueSpread = Math.max(...ratios) / Math.min(...ratios);
-    const displayed = FIXTURES.map((f) => displayedReliefFraction(f.world.spec));
-    const shownSpread = Math.max(...displayed) / Math.min(...displayed);
-    expect(shownSpread).toBeLessThan(trueSpread);
-    expect(shownSpread).toBeGreaterThan(1);
-    expect(shownSpread).toBeCloseTo(Math.sqrt(trueSpread), 5);
-  });
-
-  it('is monotonic in true relief', () => {
-    const a = displayedReliefFraction(spec(3000, 10_000));
-    const b = displayedReliefFraction(spec(3000, 20_000));
-    expect(b).toBeGreaterThan(a);
+  it('refuses a nonsense override rather than ignoring it', () => {
+    // Silently falling back is how someone concludes the terrain is flat when
+    // they simply mistyped.
+    expect(() => exaggerationFrom(q('?exaggeration=abc'))).toThrow(/positive number/);
+    expect(() => exaggerationFrom(q('?exaggeration=0'))).toThrow(/positive number/);
+    expect(() => exaggerationFrom(q('?exaggeration=-3'))).toThrow(/positive number/);
+    expect(() => exaggerationFrom(q(`?exaggeration=${String(MAX_EXAGGERATION + 1)}`))).toThrow(
+      /exceeds/,
+    );
   });
 
   it('degrades to zero rather than dividing by it', () => {
-    expect(displayedReliefFraction(spec(3000, 0))).toBe(0);
-    expect(elevationScaleFor(spec(3000, 0))).toBe(0);
-    expect(effectiveExaggeration(spec(3000, 0))).toBe(0);
-    expect(Number.isFinite(elevationScaleFor(spec(3000, -5)))).toBe(true);
+    expect(elevationScaleFor(spec(0, 10_000))).toBe(0);
+    expect(Number.isFinite(elevationScaleFor(spec(-1, 10_000)))).toBe(true);
   });
 });

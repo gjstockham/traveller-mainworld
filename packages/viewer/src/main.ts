@@ -15,7 +15,7 @@ import { DiagnosticsOverlay } from './diagnostics/overlay.js';
 import { skirtMaskFor } from './lod/neighbours.js';
 import { DEFAULT_LOD, type LodParams, selectTiles } from './lod/quadtree.js';
 import { skirtDepthFor } from './mesh/tileMesh.js';
-import { elevationScaleFor } from './render/exaggeration.js';
+import { elevationScaleFor, exaggerationFrom } from './render/exaggeration.js';
 import { PlanetRenderer, createScene } from './render/planet.js';
 import { TileStore } from './stream/tileStore.js';
 import { chooseWorld } from './world/choice.js';
@@ -86,9 +86,17 @@ function main(): void {
   const controls = bindControls(canvas, orbit);
   const overlay = new DiagnosticsOverlay(app);
 
-  // Compressed rather than flat: see render/exaggeration.ts for why a single
-  // multiplier turned the small end of the fixture set into potatoes.
-  const elevationScale = elevationScaleFor(world.spec);
+  // True scale by default: a photograph of a planet has no vertical
+  // exaggeration. `?exaggeration=<n>` is the inspection override.
+  let exaggeration;
+  try {
+    exaggeration = exaggerationFrom(params);
+  } catch (error) {
+    app.textContent = error instanceof Error ? error.message : String(error);
+    app.style.cssText = 'padding:2rem;font:14px/1.6 ui-monospace,monospace;color:#ff8a94';
+    return;
+  }
+  const elevationScale = elevationScaleFor(world.spec, exaggeration);
 
   const store = new TileStore({
     world,
