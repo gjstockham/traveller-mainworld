@@ -333,15 +333,19 @@ words rather than citing evidence that does not exist.
 
 Since then all nine cells have run green on three operating systems, on both
 golden artefacts, alongside the Node reference leg and the build-invariance
-cell; and M3 (Android Chrome, real handset) passed. It stays **Provisional**
-anyway, because M1 and M2 remain unrun and both are JavaScriptCore — so **no
-real Safari has ever executed the battery**, and Playwright's WebKit is not
-Safari. That is the one gap left, it is recorded rather than glossed in
-[the evidence file](docs/evidence/wp4-manual-checks.md), and a minute on any
-iPhone or borrowed Mac against
+cell; M3 (Android Chrome, real handset) passed; and **M2 passed on real iOS
+Safari**, which is the first time an engine Apple ships has executed this
+battery — every WebKit result before it came from Playwright's build, and that
+is not the same thing.
+
+It stays **Provisional** anyway, because M1 — desktop Safari on macOS — is still
+unrun and R1 asks for all three. The residual is narrow and named rather than
+glossed in [the evidence file](docs/evidence/wp4-manual-checks.md): the engine
+question is answered, what is left is desktop Safari's build and JIT tiers on
+desktop-class hardware. A minute on any borrowed Mac against
 [the deployed page](https://gjstockham.github.io/traveller-mainworld/verify.html)
-closes it. A divergence anywhere rewrites the ADR as a WASM decision on
-correctness grounds.
+closes it; amending R1 on the record is the other honest route. A divergence
+anywhere rewrites the ADR as a WASM decision on correctness grounds.
 
 So `crates/kernel-wasm` is **archived, not maintained** — see
 [its README](crates/kernel-wasm/README.md). The parity check left the required CI

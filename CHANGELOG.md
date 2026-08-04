@@ -71,11 +71,13 @@ above is the copy that is, and the README repeats it.
   realistic figure, and it slightly reduces the set's value as a stress test —
   recorded because it is a real cost, not a free improvement.
 
-  **Consequence for recorded evidence.** The fixture digest moves, so M3's
-  hand-check block in `docs/evidence/wp4-manual-checks.md` cites a digest that no
-  longer exists and needs re-running (about a minute on the device). The battery
-  digest `0c6181a0…` is untouched, so all twelve automated determinism cells and
-  every claim resting on kernel arithmetic remain valid.
+  **Consequence for recorded evidence.** The fixture digest moves, so the
+  hand-check blocks in `docs/evidence/wp4-manual-checks.md` cited a digest that
+  no longer exists and needed re-running. Done: M2 and M3 were both re-run
+  against fixture set `289a78e5…` and digest `9c0f8603…`, both exact, and M2 on
+  real iOS Safari this time rather than a WebKit shell. M1 was never filled. The
+  battery digest `0c6181a0…` is untouched, so all twelve automated determinism
+  cells and every claim resting on kernel arithmetic remain valid.
 
 ## 0.1.0 — 2026-08-04
 

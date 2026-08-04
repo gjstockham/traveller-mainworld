@@ -16,6 +16,11 @@ Safari and Android Chrome are specified as non-optional and all three rows are
 empty. What has been observed is three engines on one operating system, run
 locally rather than in CI.
 
+*(That paragraph is the state on 2026-08-03 and is left standing. Nine cells and
+two of the three hand-checks have run green since — see
+[the amendment](#amendment-2026-08-04--what-has-been-observed-since). M1 is
+still empty, which is why the status below has not moved.)*
+
 So this ADR does not report that the decision criteria were met. It reports that
 **no divergence has been found in the evidence gathered so far**, adopts the
 TypeScript kernel on that basis so Phase 0 can continue, and names precisely
@@ -111,10 +116,11 @@ Source: [`docs/evidence/wp4-manual-checks.md`](../evidence/wp4-manual-checks.md)
 | M3 | Chrome 150 | Android 10 | **PASS** — `0c6181a0…` / `9843cdd3…` |
 
 *(The table above is as this ADR was written. Since then the nine CI cells have
-run green on three OSes, the Node reference leg with them, and M3 has been
-hand-checked on a real Android device — see the amendment below and the evidence
-file. The original text is left standing rather than rewritten, because what
-this decision was made on is a different question from what is known now.)*
+run green on three OSes, the Node reference leg with them, and M2 and M3 have
+been hand-checked — on real iOS Safari and a real Android device respectively —
+see the amendment below and the evidence file. The original text is left
+standing rather than rewritten, because what this decision was made on is a
+different question from what is known now.)*
 
 Three engines agree, bit for bit, on **one** operating system. Reading that as
 more than it is would be easy in two specific ways, so both are stated plainly:
@@ -354,23 +360,34 @@ there are three. The "one operating system" limit named in E1 is gone.
 **M3 discharged.** Android 10 / Chrome 150, on a real handset, both digests
 exact — the first result from actual hardware and the first from an Arm CPU.
 
-**M1 and M2 are not discharged, and will not be for now.** No Mac is available
-to the author, and iOS Safari is untested by choice. Recorded here because the
-consequence is specific and easy to lose: **M1 and M2 are both JavaScriptCore,
-so no real JavaScriptCore has ever run this battery.** Every WebKit result in
-the evidence comes from Playwright's build, and this ADR already says why that
-is not the same thing. M3 does not substitute — Android Chrome is V8, the engine
-that was already best covered.
+**M2 discharged.** iOS Safari 26.5.2 on an iPhone, both digests exact. This is
+the one that mattered. Every WebKit result in this document until now came from
+Playwright's build, and the ADR says at length why that is not the same thing:
+**no engine Apple ships had ever executed this battery.** One now has. The run is
+Safari proper rather than a WebKit shell — the user agent carries `Version/…`
+with no `CriOS`/`FxiOS`/`EdgiOS` token — so it is Apple's browser, Apple's
+JavaScriptCore build, on Apple silicon. The largest single gap in E1 is closed.
 
-So the shape of the evidence has changed less than the cell count suggests. What
-was "three engines on one OS, run locally" is now "three engines on three OSes in
-CI, plus one real Arm device". What was missing is still missing, and it is the
-engine whose stand-in this document trusts least.
+**M1 is not discharged.** No Mac is available to the author. What it would add
+is now a narrow and specific thing: **desktop** Safari's build configuration and
+JIT tiers, on desktop-class hardware with no thermal or memory ceiling. The
+engine question is answered; a tiering question is not, and JIT tiering is
+precisely a mechanism by which one engine can return two answers for the same
+arithmetic. Small is not nothing.
 
-**This ADR therefore remains Provisional.** R1's remaining half is M1 and M2.
-Promoting it now would mean recording that the decision criteria were met when
-they were not — which is the failure this document opens by refusing to commit,
-and it would be no less a failure for being one row closer to true.
+So the shape of the evidence has changed more than a row count suggests. What was
+"three engines on one OS, run locally" is now "three engines on three OSes in CI,
+plus a real Arm handset, plus the vendor JavaScriptCore this whole file was
+written to reach".
+
+**This ADR nonetheless remains Provisional.** R1 as written asks for M1–M3, and
+M1's row is blank. Promoting on it would mean recording that the decision
+criteria were met when they were not — the failure this document opens by
+refusing to commit, and no less a failure for being one row from true. There are
+two honest routes: run M1 on any borrowed Mac against the deployed page, or amend
+R1 here, on the record, to treat M2 as discharging the JavaScriptCore question
+and accept the desktop-tiering residual by name. The second is legitimate. It has
+not been done, so the status stands.
 
 ---
 
@@ -381,7 +398,7 @@ exit.
 
 | # | Trigger | Consequence |
 |---|---|---|
-| **R1** | ~~The nine `browser-matrix` cells run~~ **(done, green, three OSes, both artefacts)** and M1–M3 are hand-checked. ~~M3~~ **(done, green, Android 10 / Chrome 150)**. **Outstanding: M1 and M2 — real Safari on macOS, and iOS Safari.** | **All green:** §A.3 row 1 is satisfied, this ADR becomes **Accepted**, and the "provisional" framing is removed. **Any divergence:** §A.3 row 3 selects the WASM kernel on correctness grounds regardless of performance. Record the engine, version, OS, case and both hashes; do not loosen a comparison to make a cell green. |
+| **R1** | ~~The nine `browser-matrix` cells run~~ **(done, green, three OSes, both artefacts)** and M1–M3 are hand-checked. ~~M3~~ **(done, green, Android 10 / Chrome 150)**. ~~M2~~ **(done, green, iOS Safari 26.5.2 — vendor JavaScriptCore)**. **Outstanding: M1 — real Safari on macOS.** | **All green:** §A.3 row 1 is satisfied, this ADR becomes **Accepted**, and the "provisional" framing is removed. **Any divergence:** §A.3 row 3 selects the WASM kernel on correctness grounds regardless of performance. Record the engine, version, OS, case and both hashes; do not loosen a comparison to make a cell green. |
 | **R2** | The `wasm-parity` workflow fails, or has not run in a quarter. | The mutual-parity evidence has expired. Run `pnpm check:parity`, establish whether the twin is stale or the kernel has changed, and repair the twin — it is the only check that two independent implementations agree. |
 | **R3** | A new generator feature needs an operation the whitelist bans, and no polynomial approximation over whitelisted ops is practical. | The whitelist is no longer sufficient to carry the determinism promise, which is the foundation this decision rests on. Reopen. |
 | **R4** | `pnpm bench` shows the 129² Phase-1 tile exceeding 100 ms, or pool throughput below 25 tiles/s, on the minimum target. | §A.3 row 2 applies: WASM on performance grounds. The 2.4× margin is what makes this unlikely, not impossible — Phase 1 adds passes. |
