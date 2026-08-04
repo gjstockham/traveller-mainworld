@@ -157,6 +157,73 @@ export interface HeapBaseline {
   readonly atMs: number;
 }
 
+/** Wall-clock elapsed, and how much of it the tab spent hidden. */
+export interface SessionSpan {
+  readonly totalMs: number;
+  readonly hiddenMs: number;
+  readonly hiddenGaps: number;
+}
+
+/**
+ * Elapsed time, split by whether anyone was looking.
+ *
+ * `requestAnimationFrame` does not run in a hidden tab, so the first frame after
+ * one returns carries the entire hidden period in its delta. Recorded as a frame
+ * time that is indistinguishable from a stall — and it is not a hypothetical:
+ * the first real ten-minute session reported a 58,532 ms "stall" with an empty
+ * queue, an idle worker pool and a 16.9 ms p95, which is what a backgrounded tab
+ * looks like and nothing like what a stall looks like.
+ *
+ * The criterion it broke is "no stall > 1 s", so an instrument that cannot tell
+ * those apart cannot answer the question it exists for. This separates them: the
+ * resumed frame is discarded from the timing statistics, and the hidden time is
+ * reported rather than hidden — a ten-minute session that spent nine of them in
+ * the background is not a ten-minute session.
+ */
+export class SessionClock {
+  private hiddenSince: number | undefined;
+  private hiddenTotal = 0;
+  private gaps = 0;
+  private pendingResume = false;
+
+  /** The tab went away at `now`. */
+  hide(now: number): void {
+    this.hiddenSince ??= now;
+  }
+
+  /** The tab came back at `now`. */
+  show(now: number): void {
+    if (this.hiddenSince === undefined) {
+      return;
+    }
+    this.hiddenTotal += Math.max(0, now - this.hiddenSince);
+    this.hiddenSince = undefined;
+    this.gaps++;
+    this.pendingResume = true;
+  }
+
+  /**
+   * Whether the next frame sample spans a hidden period, and must not be
+   * counted as a frame time. Answers true exactly once per gap.
+   */
+  consumeResume(): boolean {
+    const resumed = this.pendingResume;
+    this.pendingResume = false;
+    return resumed;
+  }
+
+  /** Hidden time so far, including a gap still in progress. */
+  hiddenMsAt(now: number): number {
+    return this.hiddenSince === undefined
+      ? this.hiddenTotal
+      : this.hiddenTotal + Math.max(0, now - this.hiddenSince);
+  }
+
+  get hiddenGaps(): number {
+    return this.gaps;
+  }
+}
+
 /**
  * The memory block, as pure text.
  *
@@ -176,8 +243,9 @@ export function memoryLines(
   >,
   heap: JsHeapInfo | undefined,
   baseline: HeapBaseline | undefined,
-  sessionMs: number,
+  session: SessionSpan,
 ): string[] {
+  const sessionMs = session.totalMs;
   let heapLine: string;
   if (heap === undefined) {
     heapLine = 'not reported — performance.memory is Chrome-only';
@@ -195,8 +263,27 @@ export function memoryLines(
       `${formatBytes(sample.meshLiveBytes)} mesh live, ` +
       `${formatBytes(sample.meshPooledBytes)} pooled (${sample.pooledMeshes}), ` +
       `${formatBytes(sample.meshSharedBytes)} shared`,
-    `session  ${formatDuration(sessionMs)}`,
+    `session  ${formatSession(session)}`,
   ];
+}
+
+/**
+ * Elapsed, and what fraction of it was real.
+ *
+ * A bare total would let a session that spent most of its length in another tab
+ * be read as ten minutes of use. Silence here is meaningful — no hidden clause
+ * means the tab never went away — so the clause only appears when it applies.
+ */
+function formatSession(session: SessionSpan): string {
+  if (session.hiddenGaps === 0) {
+    return formatDuration(session.totalMs);
+  }
+  const active = Math.max(0, session.totalMs - session.hiddenMs);
+  const gaps = session.hiddenGaps === 1 ? '1 gap' : `${String(session.hiddenGaps)} gaps`;
+  return (
+    `${formatDuration(session.totalMs)} total — ${formatDuration(active)} active, ` +
+    `${formatDuration(session.hiddenMs)} hidden in ${gaps}`
+  );
 }
 
 export class DiagnosticsOverlay {
@@ -213,6 +300,9 @@ export class DiagnosticsOverlay {
   private startedAt: number | undefined;
   private heapBaseline: HeapBaseline | undefined;
   private labelTimer: ReturnType<typeof setTimeout> | undefined;
+  private readonly clock = new SessionClock();
+  private readonly onVisibility: () => void;
+  private skippedResumes = 0;
 
   constructor(
     parent: HTMLElement,
@@ -281,6 +371,16 @@ export class DiagnosticsOverlay {
 
     this.container.append(this.element, this.button, this.fallback);
     parent.appendChild(this.container);
+
+    this.onVisibility = (): void => {
+      const now = performance.now();
+      if (document.visibilityState === 'hidden') {
+        this.clock.hide(now);
+      } else {
+        this.clock.show(now);
+      }
+    };
+    document.addEventListener('visibilitychange', this.onVisibility);
   }
 
   /**
@@ -370,13 +470,23 @@ export class DiagnosticsOverlay {
 
   update(sample: FrameSample, now: number): void {
     this.startedAt ??= now;
-    this.frameTimes.push(sample.frameMs);
-    if (this.frameTimes.length > WINDOW) {
-      this.frameTimes.shift();
+
+    // A frame that spans a hidden tab is not a frame time. rAF stops while the
+    // tab is away, so the first frame back carries the whole gap in its delta —
+    // and recorded as a stall it is the one number that could falsify C3 while
+    // meaning nothing. Discarded from both statistics, and the gap is reported
+    // on the session line instead of being quietly dropped.
+    if (this.clock.consumeResume()) {
+      this.skippedResumes++;
+    } else {
+      this.frameTimes.push(sample.frameMs);
+      if (this.frameTimes.length > WINDOW) {
+        this.frameTimes.shift();
+      }
+      // Worst frame is tracked un-smoothed: a single 1 s stall is exactly what
+      // the exit criteria care about, and an average would bury it.
+      this.worstFrameMs = Math.max(this.worstFrameMs, sample.frameMs);
     }
-    // Worst frame is tracked un-smoothed: a single 1 s stall is exactly what
-    // the exit criteria care about, and an average would bury it.
-    this.worstFrameMs = Math.max(this.worstFrameMs, sample.frameMs);
 
     if (now - this.lastThroughputAt >= 1000) {
       const elapsed = (now - this.lastThroughputAt) / 1000;
@@ -405,7 +515,10 @@ export class DiagnosticsOverlay {
       `world    ${this.stamp.worldShort}  ·  build ${shortBuild(this.stamp.build)}`,
       '',
       `fps      ${(1000 / mean).toFixed(0).padStart(5)}   (${mean.toFixed(1)} ms mean, ${p95.toFixed(1)} p95)`,
-      `worst    ${this.worstFrameMs.toFixed(0).padStart(5)} ms${this.worstFrameMs > 1000 ? '  <-- STALL > 1s' : ''}`,
+      `worst    ${this.worstFrameMs.toFixed(0).padStart(5)} ms${this.worstFrameMs > 1000 ? '  <-- STALL > 1s' : ''}` +
+        (this.skippedResumes === 0
+          ? ''
+          : `  (${String(this.skippedResumes)} resumed frame(s) excluded)`),
       `altitude ${formatAltitude(sample.altitudeKm)}`,
       '',
       `tiles    ${String(sample.visibleTiles).padStart(5)} visible, depth ${sample.maxDepth}`,
@@ -417,7 +530,11 @@ export class DiagnosticsOverlay {
       `cache    ${sample.cacheSize}/${sample.cacheCapacity}  ${hitRate.toFixed(0)}% hit`,
       `xfer     ${formatBytes(sample.bytesTransferred)}`,
       '',
-      ...memoryLines(sample, readJsHeap(), this.heapBaseline, now - (this.startedAt ?? now)),
+      ...memoryLines(sample, readJsHeap(), this.heapBaseline, {
+        totalMs: now - (this.startedAt ?? now),
+        hiddenMs: this.clock.hiddenMsAt(now),
+        hiddenGaps: this.clock.hiddenGaps,
+      }),
     ].join('\n');
   }
 
@@ -442,6 +559,7 @@ export class DiagnosticsOverlay {
     if (this.labelTimer !== undefined) {
       clearTimeout(this.labelTimer);
     }
+    document.removeEventListener('visibilitychange', this.onVisibility);
     this.container.remove();
   }
 }

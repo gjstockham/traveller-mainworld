@@ -38,7 +38,7 @@ The panel reports, in the order the criteria need them:
 | `queue`, `gen`, `cancel` | why a stall happened, when one does |
 | `heap` — main-thread JS heap and its drift from a post-startup baseline | memory stable over 10 minutes |
 | `resident` — cached tile bytes, live and pooled mesh bytes | memory stable over 10 minutes |
-| `session` — elapsed | that the 10 minutes were actually 10 minutes |
+| `session` — elapsed, split into active and hidden | that the 10 minutes were actually 10 minutes |
 
 **The two memory numbers are independent on purpose, and neither is sufficient
 alone.**
@@ -136,6 +136,20 @@ them.
 
 Fly with DevTools closed: having it open taxes the frame rate being measured.
 The `session` clock and the heap baseline survive opening it afterwards.
+
+**Keep the tab visible for the whole session.** `requestAnimationFrame` stops in
+a hidden tab, so the first frame back carries the entire gap in its delta — and
+as a frame time that is indistinguishable from a stall. The first ten-minute
+attempt reported a `58,532 ms` worst frame with an empty queue, an idle worker
+pool and a 16.9 ms p95, which is a backgrounded tab and nothing like a stall.
+
+The panel now separates the two rather than leaving it to be argued afterwards:
+the resumed frame is excluded from the timing statistics and `worst` says so, and
+the `session` line reads `17m 40s total — 3m 40s active, 14m 00s hidden in 2
+gaps` when it applies. A bare duration therefore means an uninterrupted session.
+A block with hidden time in it is still usable evidence for C5 — but the number
+that matters is **active**, because nothing renders, streams or allocates while
+the tab is away.
 
 <!-- C1/C3/C4 — end of the descent -->
 ```

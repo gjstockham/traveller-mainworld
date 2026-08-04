@@ -128,6 +128,42 @@ test('hands back a pasteable evidence block', async ({ page, context }) => {
   expect(copied).toMatch(/^resident /m);
 });
 
+test('discloses hidden time rather than booking it as a stall', async ({ page }) => {
+  await page.goto('/');
+  await awaitOverlay(page);
+
+  // An uninterrupted session says nothing about hidden time, and a reader is
+  // entitled to take that silence at face value.
+  expect(await readOverlay(page)).not.toContain('hidden');
+
+  // Headless Chromium cannot really be backgrounded, so the visibility state is
+  // overridden and the event dispatched by hand. This exercises the wiring —
+  // listener attached, clock consulted, line rendered — and not the browser's
+  // own hiding behaviour, which is the part that has to be taken on trust.
+  await page.evaluate(async () => {
+    const fake = (state: string): void => {
+      Object.defineProperty(document, 'visibilityState', {
+        value: state,
+        configurable: true,
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+    fake('hidden');
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    fake('visible');
+  });
+
+  await expect(page.locator('#app pre')).toContainText('hidden in 1 gap', { timeout: 10_000 });
+  const overlay = await readOverlay(page);
+  expect(overlay).toContain('total');
+  expect(overlay).toContain('active');
+
+  // And the frame that carried the gap is not a stall: the whole point.
+  const worst = overlay.split('\n').find((l) => l.startsWith('worst')) ?? '';
+  expect(worst).toContain('resumed frame(s) excluded');
+  expect(worst).not.toContain('STALL');
+});
+
 test('refines LOD as the camera zooms in', async ({ page }) => {
   await page.goto('/');
   await awaitOverlay(page);

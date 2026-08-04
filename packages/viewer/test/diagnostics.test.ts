@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   type EvidenceStamp,
   type HeapBaseline,
+  SessionClock,
+  type SessionSpan,
   type StampEnvironment,
   memoryLines,
   stampLines,
@@ -20,9 +22,12 @@ const SAMPLE = {
   pooledMeshes: 128,
 };
 
+/** An uninterrupted session of the given length. */
+const SPAN = (totalMs: number): SessionSpan => ({ totalMs, hiddenMs: 0, hiddenGaps: 0 });
+
 describe('memoryLines', () => {
   it('says the heap is unavailable rather than reporting a zero', () => {
-    const [heap] = memoryLines(SAMPLE, undefined, undefined, 0);
+    const [heap] = memoryLines(SAMPLE, undefined, undefined, SPAN(0));
     // The failure this guards against is a panel that shows "heap 0 KiB" on
     // Firefox and Safari, which reads as a measurement and is not one.
     expect(heap).toMatch(/not reported/);
@@ -35,7 +40,7 @@ describe('memoryLines', () => {
       SAMPLE,
       { usedJSHeapSize: 412 << 20, jsHeapSizeLimit: 4 * 1024 ** 3 },
       undefined,
-      0,
+      SPAN(0),
     );
     expect(heap).toContain('412.0 MiB');
     expect(heap).toContain('4.00 GiB');
@@ -50,7 +55,7 @@ describe('memoryLines', () => {
       SAMPLE,
       { usedJSHeapSize: 437 << 20, jsHeapSizeLimit: 4 * 1024 ** 3 },
       baseline,
-      555_000,
+      SPAN(555_000),
     );
     expect(heap).toContain('+37.0 MiB');
     // Elapsed is measured from the baseline, not from page load: 555 s - 3 s.
@@ -63,18 +68,101 @@ describe('memoryLines', () => {
       SAMPLE,
       { usedJSHeapSize: 380 << 20, jsHeapSizeLimit: 4 * 1024 ** 3 },
       baseline,
-      60_000,
+      SPAN(60_000),
     );
     expect(heap).toContain('-20.0 MiB');
     expect(heap).not.toContain('+');
   });
 
   it('reports resident bytes and the session clock', () => {
-    const [, resident, session] = memoryLines(SAMPLE, undefined, undefined, 624_000);
+    const [, resident, session] = memoryLines(SAMPLE, undefined, undefined, SPAN(624_000));
     expect(resident).toContain('128.0 MiB tiles (302)');
     expect(resident).toContain('96.0 MiB mesh live');
     expect(resident).toContain('40.0 MiB pooled (128)');
     expect(session).toContain('10m 24s');
+  });
+
+  it('says nothing about hidden time when the tab never went away', () => {
+    // Silence is meaningful here: a reader must be able to take a bare duration
+    // as "ten minutes of use" without checking anything else.
+    const [, , session] = memoryLines(SAMPLE, undefined, undefined, SPAN(624_000));
+    expect(session).not.toContain('hidden');
+    expect(session).not.toContain('total');
+  });
+
+  it('splits elapsed into active and hidden once the tab has been away', () => {
+    // The failure this exists for: a 17m session with 14m of it in another tab
+    // reading as a 17-minute soak. It is a 3m 40s soak.
+    const [, , session] = memoryLines(SAMPLE, undefined, undefined, {
+      totalMs: 1_060_000,
+      hiddenMs: 840_000,
+      hiddenGaps: 2,
+    });
+    expect(session).toContain('17m 40s total');
+    expect(session).toContain('3m 40s active');
+    expect(session).toContain('14m 00s hidden in 2 gaps');
+  });
+
+  it('counts a single gap in the singular', () => {
+    const [, , session] = memoryLines(SAMPLE, undefined, undefined, {
+      totalMs: 120_000,
+      hiddenMs: 30_000,
+      hiddenGaps: 1,
+    });
+    expect(session).toContain('hidden in 1 gap');
+    expect(session).not.toContain('1 gaps');
+  });
+});
+
+describe('SessionClock', () => {
+  it('accumulates hidden time across gaps', () => {
+    const clock = new SessionClock();
+    clock.hide(1_000);
+    clock.show(4_000);
+    clock.hide(10_000);
+    clock.show(20_000);
+    expect(clock.hiddenMsAt(25_000)).toBe(13_000);
+    expect(clock.hiddenGaps).toBe(2);
+  });
+
+  it('counts a gap still in progress, so a hidden tab is not reported as active', () => {
+    const clock = new SessionClock();
+    clock.hide(1_000);
+    // Nothing calls back while the tab is away — rAF is stopped — so the figure
+    // has to be computed from now rather than accumulated on resume.
+    expect(clock.hiddenMsAt(6_000)).toBe(5_000);
+    expect(clock.hiddenGaps).toBe(0);
+  });
+
+  it('flags exactly one frame per resume as uncountable', () => {
+    const clock = new SessionClock();
+    expect(clock.consumeResume()).toBe(false);
+    clock.hide(0);
+    clock.show(60_000);
+    // The first frame back carries the whole 60 s gap; every frame after it is
+    // a real frame again.
+    expect(clock.consumeResume()).toBe(true);
+    expect(clock.consumeResume()).toBe(false);
+  });
+
+  it('ignores a resume that follows no gap', () => {
+    // visibilitychange can fire visible→visible in some browsers; treating that
+    // as a resume would silently discard a genuine slow frame.
+    const clock = new SessionClock();
+    clock.show(5_000);
+    expect(clock.consumeResume()).toBe(false);
+    expect(clock.hiddenGaps).toBe(0);
+    expect(clock.hiddenMsAt(9_000)).toBe(0);
+  });
+
+  it('does not restart the clock when hidden fires twice', () => {
+    const clock = new SessionClock();
+    clock.hide(1_000);
+    clock.hide(3_000);
+    clock.show(5_000);
+    // The gap began at the first hide. Taking the later one would under-report
+    // it, which is the direction that flatters the measurement.
+    expect(clock.hiddenMsAt(5_000)).toBe(4_000);
   });
 });
 
