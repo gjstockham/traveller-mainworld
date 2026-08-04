@@ -42,6 +42,16 @@ const TILE_N = 64;
  */
 const INITIAL_ALTITUDE_KM = 15_000;
 
+/**
+ * The commit this bundle was built from, injected by the Pages workflow.
+ *
+ * Same reasoning as `verify.html`, and the same fallback: a Spike C session
+ * block that cannot be tied back to a commit says what the numbers were and
+ * nothing about which code produced them. `local build` when served from a
+ * working tree, which is information rather than a gap.
+ */
+const BUILD_COMMIT: string = import.meta.env['VITE_COMMIT'] ?? 'local build';
+
 function main(): void {
   const app = document.querySelector<HTMLDivElement>('#app');
   if (app === null) {
@@ -84,7 +94,6 @@ function main(): void {
     maxAltitude: Math.max(DEFAULT_ORBIT.maxAltitude, initialAltitude * 3),
   });
   const controls = bindControls(canvas, orbit);
-  const overlay = new DiagnosticsOverlay(app);
 
   // True scale by default: a photograph of a planet has no vertical
   // exaggeration. `?exaggeration=<n>` is the inspection override.
@@ -97,6 +106,17 @@ function main(): void {
     return;
   }
   const elevationScale = elevationScaleFor(world.spec, exaggeration);
+
+  // Built after the exaggeration is resolved, because the stamp records it: a
+  // session flown through the inspection override is not evidence about the
+  // frame rate of the shipped view.
+  const overlay = new DiagnosticsOverlay(app, {
+    world: label,
+    worldShort: choice.fixtureId ?? 'default world',
+    build: BUILD_COMMIT,
+    tileN: TILE_N,
+    exaggeration,
+  });
 
   const store = new TileStore({
     world,

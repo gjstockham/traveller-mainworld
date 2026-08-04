@@ -84,6 +84,37 @@ test('boots, streams tiles and renders', async ({ page }) => {
   expect(overlay).toContain('main thread only');
 });
 
+test('hands back a pasteable evidence block', async ({ page, context }) => {
+  // The Spike C criteria are recorded by pressing this button and pasting into
+  // docs/evidence/spikec-exit.md, so "the button works" is part of the
+  // measurement path rather than a UI nicety.
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/?fixture=size8-earthlike');
+  await awaitOverlay(page);
+  await expect
+    .poll(async () => metric(await readOverlay(page), 'tiles'), { timeout: 30_000 })
+    .toBeGreaterThan(5);
+
+  // Located structurally, not by name: the label is what the click changes, so
+  // a name-based locator stops matching the element it just pressed.
+  const button = page.locator('#app button');
+  await expect(button).toHaveText('Copy evidence');
+  await button.click();
+  await expect(button).toHaveText('Copied', { timeout: 5_000 });
+
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+
+  // The stamp: what produced the numbers.
+  expect(copied).toContain('size8-earthlike');
+  expect(copied).toContain('tile mesh');
+  expect(copied).toContain('exaggeration');
+  expect(copied).toContain('user agent');
+  expect(copied).toContain('build');
+  // And the numbers themselves, or the block is only half of one.
+  expect(copied).toMatch(/^fps /m);
+  expect(copied).toMatch(/^resident /m);
+});
+
 test('refines LOD as the camera zooms in', async ({ page }) => {
   await page.goto('/');
   await awaitOverlay(page);

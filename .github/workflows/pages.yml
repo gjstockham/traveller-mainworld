@@ -67,7 +67,14 @@ jobs:
       # build-invariance cell still mirrors how the viewer is bundled. Passed on
       # the command line rather than in a vite.config, which would break that
       # mirror and fail `pnpm lint:invariance`.
+      #
+      # Stamped with the commit for the same reason verify.html is: the Spike C
+      # exit criteria are read off the viewer's diagnostics panel and pasted
+      # into docs/evidence/spikec-exit.md, and a block that cannot name the
+      # build it came from is an anecdote.
       - run: pnpm --filter @traveller-mainworld/viewer exec vite build --base=./
+        env:
+          VITE_COMMIT: ${{ github.sha }}
 
       - name: Assemble the site
         run: |

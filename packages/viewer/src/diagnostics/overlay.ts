@@ -56,6 +56,74 @@ export interface FrameSample {
   readonly pooledMeshes: number;
 }
 
+/**
+ * What a pasted session block has to identify about itself.
+ *
+ * The same problem WP4's evidence blocks solve: a panel screenshot says what the
+ * numbers were and nothing about what produced them, and "it flew fine" is not
+ * something Phase 0 can exit on. A block that cannot be tied to a fixture, a
+ * build and a machine is an anecdote.
+ */
+export interface EvidenceStamp {
+  /** Full world description — what the block records. */
+  readonly world: string;
+  /** Fixture id, or `default world`. What the panel has room for. */
+  readonly worldShort: string;
+  /** Commit the bundle was built from, or `local build`. */
+  readonly build: string;
+  /** Mesh grid parameter. 64 means a 65² mesh — open question 1. */
+  readonly tileN: number;
+  /**
+   * Vertical exaggeration in force. 1 is true scale; anything else means the
+   * session was flown through an inspection override, which is worth knowing
+   * before reading a frame rate off it.
+   */
+  readonly exaggeration: number;
+}
+
+/** Browser-supplied facts, passed in so the block can be built and tested. */
+export interface StampEnvironment {
+  readonly userAgent: string;
+  readonly hardwareConcurrency: number;
+  readonly deviceMemoryGb: number | undefined;
+  readonly screenWidth: number;
+  readonly screenHeight: number;
+  readonly devicePixelRatio: number;
+  readonly at: Date;
+}
+
+/**
+ * The identification half of a session block.
+ *
+ * Deliberately the same label-and-value shape as WP4's evidence blocks, so the
+ * two evidence files read alike and a reader who knows one knows the other.
+ */
+export function stampLines(stamp: EvidenceStamp, env: StampEnvironment): string[] {
+  const pairs: [string, string][] = [
+    ['world', stamp.world],
+    ['tile mesh', `${String(stamp.tileN + 1)}² (TILE_N ${String(stamp.tileN)})`],
+    [
+      'exaggeration',
+      stamp.exaggeration === 1 ? '1 (true scale)' : `${String(stamp.exaggeration)} (OVERRIDE)`,
+    ],
+    ['user agent', env.userAgent],
+    [
+      'hardware',
+      `cores ${String(env.hardwareConcurrency)}, memory ${
+        env.deviceMemoryGb === undefined ? 'not reported' : `${String(env.deviceMemoryGb)} GB`
+      }`,
+    ],
+    [
+      'screen',
+      `${String(env.screenWidth)}×${String(env.screenHeight)} @ ${String(env.devicePixelRatio)}`,
+    ],
+    ['run at', env.at.toISOString()],
+    ['build', stamp.build],
+  ];
+  const width = Math.max(...pairs.map(([label]) => label.length));
+  return pairs.map(([label, value]) => `${label.padEnd(width)}  ${value}`);
+}
+
 /** The Chrome-only shape of `performance.memory`. */
 interface JsHeapInfo {
   readonly usedJSHeapSize: number;
@@ -132,7 +200,10 @@ export function memoryLines(
 }
 
 export class DiagnosticsOverlay {
+  private readonly container: HTMLDivElement;
   private readonly element: HTMLPreElement;
+  private readonly button: HTMLButtonElement;
+  private readonly fallback: HTMLTextAreaElement;
   private readonly frameTimes: number[] = [];
   private worstFrameMs = 0;
   private lastGenerated = 0;
@@ -142,12 +213,27 @@ export class DiagnosticsOverlay {
   private startedAt: number | undefined;
   private heapBaseline: HeapBaseline | undefined;
 
-  constructor(parent: HTMLElement) {
-    this.element = document.createElement('pre');
-    this.element.style.cssText = [
+  constructor(
+    parent: HTMLElement,
+    private readonly stamp: EvidenceStamp,
+  ) {
+    // The container carries the positioning and stays transparent to the
+    // pointer, so the panel never swallows a drag meant for the camera. Only
+    // the button opts back in.
+    this.container = document.createElement('div');
+    this.container.style.cssText = [
       'position:absolute',
       'top:8px',
       'left:8px',
+      'pointer-events:none',
+      'display:flex',
+      'flex-direction:column',
+      'align-items:flex-start',
+      'gap:6px',
+    ].join(';');
+
+    this.element = document.createElement('pre');
+    this.element.style.cssText = [
       'margin:0',
       'padding:8px 10px',
       'background:rgba(5,7,13,0.72)',
@@ -155,10 +241,99 @@ export class DiagnosticsOverlay {
       'font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace',
       'border:1px solid rgba(120,150,190,0.25)',
       'border-radius:4px',
-      'pointer-events:none',
       'white-space:pre',
     ].join(';');
-    parent.appendChild(this.element);
+
+    this.button = document.createElement('button');
+    this.button.type = 'button';
+    this.button.textContent = 'Copy evidence';
+    this.button.style.cssText = [
+      'pointer-events:auto',
+      'padding:4px 9px',
+      'background:rgba(5,7,13,0.72)',
+      'color:#9fb3d0',
+      'font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace',
+      'border:1px solid rgba(120,150,190,0.35)',
+      'border-radius:4px',
+      'cursor:pointer',
+    ].join(';');
+    this.button.addEventListener('click', () => {
+      this.copyEvidence();
+    });
+
+    // Hidden until the clipboard refuses. A `pre` cannot be selected by hand
+    // here (the panel is pointer-events:none, and making it selectable would
+    // cost every camera drag), so the fallback needs something that can be.
+    this.fallback = document.createElement('textarea');
+    this.fallback.readOnly = true;
+    this.fallback.hidden = true;
+    this.fallback.style.cssText = [
+      'pointer-events:auto',
+      'width:44ch',
+      'height:12em',
+      'background:rgba(5,7,13,0.92)',
+      'color:#9fb3d0',
+      'font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace',
+      'border:1px solid rgba(120,150,190,0.35)',
+      'border-radius:4px',
+    ].join(';');
+
+    this.container.append(this.element, this.button, this.fallback);
+    parent.appendChild(this.container);
+  }
+
+  /**
+   * The pasteable block: what produced these numbers, then the numbers.
+   *
+   * Built on demand rather than kept up to date, so it can never be stale
+   * relative to the panel it is read from.
+   */
+  evidenceText(): string {
+    const nav = navigator as Navigator & { deviceMemory?: number };
+    const lines = stampLines(this.stamp, {
+      userAgent: navigator.userAgent,
+      hardwareConcurrency: navigator.hardwareConcurrency,
+      deviceMemoryGb: nav.deviceMemory,
+      screenWidth: screen.width,
+      screenHeight: screen.height,
+      devicePixelRatio: devicePixelRatio,
+      at: new Date(),
+    });
+    return `${lines.join('\n')}\n\n${this.element.textContent ?? ''}`;
+  }
+
+  /**
+   * Copy, or fall back to something the reader can select, and say which.
+   *
+   * `navigator.clipboard` is secure-context only. Served over plain HTTP from a
+   * LAN address — the obvious way to reach a laptop or a phone that is not this
+   * machine — it is `undefined`. The same trap `verify.html` hit: a button that
+   * silently does nothing is worse than no button, because the instructions
+   * elsewhere say to press it.
+   */
+  private copyEvidence(): void {
+    const text = this.evidenceText();
+    const { clipboard } = navigator;
+    if (clipboard === undefined) {
+      this.offerSelection(text, 'the clipboard API needs HTTPS');
+      return;
+    }
+    void clipboard.writeText(text).then(
+      () => {
+        this.fallback.hidden = true;
+        this.button.textContent = 'Copied';
+      },
+      () => {
+        this.offerSelection(text, 'the clipboard was refused');
+      },
+    );
+  }
+
+  private offerSelection(text: string, why: string): void {
+    this.fallback.value = text;
+    this.fallback.hidden = false;
+    this.fallback.select();
+    this.button.textContent = `Selected — copy by hand (${why})`;
   }
 
   update(sample: FrameSample, now: number): void {
@@ -193,6 +368,10 @@ export class DiagnosticsOverlay {
         : (100 * sample.cacheHits) / (sample.cacheHits + sample.cacheMisses);
 
     this.element.textContent = [
+      // Identity first, so a screenshot of the panel is at least traceable even
+      // though the copied block is what the evidence file wants.
+      `world    ${this.stamp.worldShort}  ·  build ${shortBuild(this.stamp.build)}`,
+      '',
       `fps      ${(1000 / mean).toFixed(0).padStart(5)}   (${mean.toFixed(1)} ms mean, ${p95.toFixed(1)} p95)`,
       `worst    ${this.worstFrameMs.toFixed(0).padStart(5)} ms${this.worstFrameMs > 1000 ? '  <-- STALL > 1s' : ''}`,
       `altitude ${formatAltitude(sample.altitudeKm)}`,
@@ -228,7 +407,7 @@ export class DiagnosticsOverlay {
   }
 
   dispose(): void {
-    this.element.remove();
+    this.container.remove();
   }
 }
 
@@ -260,6 +439,17 @@ function formatBytes(n: number): string {
     return `${(n / (1 << 20)).toFixed(1)} MiB`;
   }
   return `${(n / 1024).toFixed(0)} KiB`;
+}
+
+/**
+ * Abbreviate a commit for the panel only.
+ *
+ * The copied block carries the full value: an abbreviation is for reading, not
+ * for citing, and `local build` must survive untouched because a block from a
+ * working tree is not reproducible by anyone else — which is itself evidence.
+ */
+function shortBuild(build: string): string {
+  return /^[0-9a-f]{40}$/.test(build) ? build.slice(0, 7) : build;
 }
 
 /** Byte delta with an explicit sign — the sign is the finding. */

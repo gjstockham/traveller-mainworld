@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { type HeapBaseline, memoryLines } from '../src/diagnostics/overlay.js';
+import {
+  type EvidenceStamp,
+  type HeapBaseline,
+  type StampEnvironment,
+  memoryLines,
+  stampLines,
+} from '../src/diagnostics/overlay.js';
 import { PlanetRenderer } from '../src/render/planet.js';
 import type { ReadyTile } from '../src/stream/tileStore.js';
 import { vertexCount } from '../src/mesh/tileMesh.js';
@@ -69,6 +75,64 @@ describe('memoryLines', () => {
     expect(resident).toContain('96.0 MiB mesh live');
     expect(resident).toContain('40.0 MiB pooled (128)');
     expect(session).toContain('10m 24s');
+  });
+});
+
+describe('stampLines', () => {
+  const STAMP: EvidenceStamp = {
+    world: 'fixture size8-earthlike — 6371 km radius, 20000 m relief, 12 octaves',
+    worldShort: 'size8-earthlike',
+    build: 'db0cac8a1b2c3d4e5f60718293a4b5c6d7e8f900',
+    tileN: 64,
+    exaggeration: 1,
+  };
+  const ENV: StampEnvironment = {
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/150.0.0.0',
+    hardwareConcurrency: 8,
+    deviceMemoryGb: 8,
+    screenWidth: 1920,
+    screenHeight: 1080,
+    devicePixelRatio: 1,
+    at: new Date('2026-08-04T15:00:00.000Z'),
+  };
+  const find = (lines: string[], label: string): string =>
+    lines.find((l) => l.startsWith(label)) ?? `no '${label}' line`;
+
+  it('records what produced the numbers, in full', () => {
+    const lines = stampLines(STAMP, ENV);
+    // The full commit, not the abbreviation — an abbreviation is for reading,
+    // and this block is for citing.
+    expect(find(lines, 'build')).toContain(STAMP.build);
+    expect(find(lines, 'world')).toContain('size8-earthlike');
+    expect(find(lines, 'user agent')).toContain('Chrome/150.0.0.0');
+    expect(find(lines, 'hardware')).toContain('cores 8, memory 8 GB');
+    expect(find(lines, 'screen')).toContain('1920×1080 @ 1');
+    expect(find(lines, 'run at')).toContain('2026-08-04T15:00:00.000Z');
+  });
+
+  it('names the mesh resolution the session actually ran at', () => {
+    // 65² mesh against 129² hashed generation is open question 1, so a block
+    // that does not say which one it flew cannot settle it.
+    expect(find(stampLines(STAMP, ENV), 'tile mesh')).toContain('65² (TILE_N 64)');
+  });
+
+  it('flags an exaggeration override loudly, and true scale plainly', () => {
+    expect(find(stampLines(STAMP, ENV), 'exaggeration')).toContain('1 (true scale)');
+    const override = stampLines({ ...STAMP, exaggeration: 20 }, ENV);
+    // A frame rate measured at 20× exaggeration is not a measurement of the
+    // shipped view, and the block must not let that pass unremarked.
+    expect(find(override, 'exaggeration')).toContain('OVERRIDE');
+  });
+
+  it('says memory is unreported rather than inventing a figure', () => {
+    const lines = stampLines(STAMP, { ...ENV, deviceMemoryGb: undefined });
+    expect(find(lines, 'hardware')).toContain('memory not reported');
+    expect(find(lines, 'hardware')).not.toMatch(/memory \d/);
+  });
+
+  it('leaves a local build named as one', () => {
+    const lines = stampLines({ ...STAMP, build: 'local build' }, ENV);
+    expect(find(lines, 'build')).toContain('local build');
   });
 });
 

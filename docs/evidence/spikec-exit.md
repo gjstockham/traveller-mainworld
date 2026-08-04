@@ -119,10 +119,23 @@ seam is *expected* there; a seam anywhere else is a finding.
 
 ## Results
 
-Paste the overlay contents verbatim, the same way the WP4 evidence blocks work —
-a transcribed summary is a claim, a pasted panel is evidence. One block at the
-end of the orbit-to-surface flight (C1, C3, C4) and one at the ten-minute mark
-(C5), so the two memory readings have a real interval between them.
+Press **Copy evidence** under the panel and paste the block verbatim, the same
+way the WP4 evidence blocks work — a transcribed summary is a claim, a pasted
+block is evidence. The block carries a stamp above the numbers: world, mesh
+resolution, exaggeration, user agent, hardware, screen, timestamp and the commit
+the bundle was built from. That stamp is most of the machine table above, so
+fill that in from a pasted block rather than from memory.
+
+If the page is served over plain HTTP — a LAN address, say — `navigator.clipboard`
+does not exist. The button then reveals the block in a selectable box and says
+why, rather than silently doing nothing.
+
+One block at the end of the orbit-to-surface flight (C1, C3, C4) and one at the
+ten-minute mark (C5), so the two memory readings have a real interval between
+them.
+
+Fly with DevTools closed: having it open taxes the frame rate being measured.
+The `session` clock and the heap baseline survive opening it afterwards.
 
 <!-- C1/C3/C4 — end of the descent -->
 ```
