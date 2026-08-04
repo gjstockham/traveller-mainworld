@@ -1,0 +1,81 @@
+name: Pages
+
+# Publishes the determinism verification page so M1-M3 can be hand-checked
+# (docs/evidence/wp4-manual-checks.md).
+#
+# Playwright's WebKit is not Safari, so the nine browser-matrix cells cannot
+# close Spike A on their own. Real Safari, iOS Safari and Android Chrome are
+# hand-checked against `packages/golden/verify.html`, and a check that has to be
+# repeated on borrowed devices has to cost nothing: open a URL, read PASS or
+# FAIL, copy the evidence block.
+#
+# Deployed from CI rather than uploaded by hand, for provenance. The page stamps
+# the commit it was built from into its own evidence block, so a block pasted
+# into the evidence table names the build that produced it. An evidence block
+# nobody can map back to a commit is a tick, not evidence — which is the failure
+# mode ADR-0001 was written to avoid.
+#
+# HTTPS also matters here and not only for comfort: `navigator.clipboard` is
+# secure-context only, so over a plain-HTTP LAN address the page's Copy button
+# has to fall back to selecting the text. It says so when it does.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege plus what deploy-pages needs.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; never cancel one in flight, or Pages can be left
+# serving a half-published tree.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      # Refuse to publish a page that does not agree with the committed
+      # manifests on the reference platform. Without this, a broken build could
+      # be hand-checked on a borrowed Mac and reported as a browser divergence —
+      # a harness problem wearing the costume of a determinism finding, which is
+      # exactly what the evidence file tells people to rule out first.
+      - run: pnpm golden:verify
+
+      # The commit is stamped into the page's evidence block.
+      - run: pnpm --filter @traveller-mainworld/golden build:web
+        env:
+          VITE_COMMIT: ${{ github.sha }}
+
+      - uses: actions/configure-pages@v5
+      # The whole tree: `verify.html` at the root is the canonical page, and the
+      # `unminified/` and `viewer-profile/` build-invariance profiles come along
+      # so a real device can be pointed at those bundles too if a divergence
+      # ever needs narrowing down to the bundler.
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: packages/golden/dist-web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

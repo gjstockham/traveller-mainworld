@@ -146,15 +146,38 @@ namesakes.
 
 ### Serving the page
 
+**The deployed page is the primary route:**
+
+> **https://gjstockham.github.io/traveller-mainworld/verify.html**
+
+Published by `.github/workflows/pages.yml` on every push to `main`, but only
+after `pnpm golden:verify` passes in the same job — so a build that already
+disagrees with the manifests on the reference platform never reaches a device.
+Each deploy stamps its commit into the evidence block, so a pasted block names
+the build that produced it.
+
+HTTPS matters beyond convenience: `navigator.clipboard` is secure-context only,
+so over a plain-HTTP address the **Copy evidence** button falls back to
+selecting the text and says so rather than doing nothing.
+
+Local alternatives, if the deployed page is not what you want to test:
+
 ```sh
 pnpm golden:page      # builds and serves packages/golden/verify.html on :4174,
                       # bound to every interface so a phone on the LAN can reach it
 ```
 
-Then open `http://<this machine's LAN IP>:4174/verify.html` on the device. The
-build in `packages/golden/dist-web/` is a static, self-contained page — copying
-it to any static host or a USB stick works equally well, and is the easier route
-to a borrowed Mac.
+Then open `http://<this machine's LAN IP>:4174/verify.html` on the device. Note
+that on **WSL2 this will not work from another device by default** — WSL2 sits
+behind a NAT'd virtual NIC, so the port needs forwarding from the Windows host
+(`netsh interface portproxy`) plus a firewall rule, unless mirrored networking
+is enabled. That obstacle is why the deployed page exists.
+
+The build in `packages/golden/dist-web/` is a static, self-contained page —
+copying it to a USB stick works equally well, and is a reasonable route to a
+borrowed Mac with no network access. A block pasted from such a build reports
+`build  local build` rather than a commit, which is worth noticing when reading
+the evidence later.
 
 The run takes a minute or two, and the tab must stay in the foreground (a
 backgrounded tab gets throttled, and on iOS may be discarded outright). The page

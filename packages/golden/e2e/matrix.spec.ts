@@ -75,6 +75,17 @@ test('the battery and the fixtures are bit-identical to the committed manifests'
   // On disk and in the log, on pass as well as failure: a green cell is the
   // evidence ADR-0001 rests on, and evidence nobody can read afterwards is
   // just a tick. The workflow uploads this directory from every cell.
+  // Short, explicit timeouts on the two UI assertions below. The config's
+  // 600 s `expect` timeout is sized for waiting out a full battery run; letting
+  // a button assertion inherit it turns a one-line UI regression into a
+  // ten-minute failure in each of nine cells, which is how a cheap check
+  // becomes an expensive one nobody wants to keep.
+  const UI_TIMEOUT = 10_000;
+  const copyButton = page.locator('#copy');
+  await expect(copyButton, 'the evidence copy button never appeared').toBeVisible({
+    timeout: UI_TIMEOUT,
+  });
+
   const evidencePath = testInfo.outputPath('evidence.txt');
   writeFileSync(evidencePath, `${result.evidence}\n`);
   await testInfo.attach('evidence.txt', { path: evidencePath, contentType: 'text/plain' });
@@ -113,6 +124,18 @@ test('the battery and the fixtures are bit-identical to the committed manifests'
   expect(result.fixtureMismatches, divergenceReport(result)).toEqual([]);
   expect(result.fixtureDigest, divergenceReport(result)).toBe(FIXTURES.digest);
   expect(result.status, divergenceReport(result)).toBe('pass');
+
+  // The evidence block has to be gettable off the device, and the button that
+  // does it used to fail silently where `navigator.clipboard` is unavailable —
+  // which is every plain-HTTP LAN address, i.e. exactly the phones M2 and M3
+  // are checked on. Whatever this engine allows, the label must change: copied,
+  // or selected-and-said-so. It must never look like nothing happened.
+  const before = await copyButton.textContent();
+  await copyButton.click();
+  await expect(copyButton, 'the Copy evidence button did nothing visible').not.toHaveText(
+    before ?? '',
+    { timeout: UI_TIMEOUT },
+  );
 
   expect(pageErrors, `page errors:\n${pageErrors.join('\n')}`).toEqual([]);
 });

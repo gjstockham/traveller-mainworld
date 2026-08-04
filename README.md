@@ -178,9 +178,16 @@ buffer it was, and both hashes.
 
 Playwright's WebKit is **not** Safari, so the matrix cannot close this on its
 own. Real Safari, iOS Safari and Android Chrome are hand-checked against
-`packages/golden/verify.html` — a static page that runs the same battery and the
-same fixture worlds and prints PASS/FAIL, both digests, the fixture-set hash, and
-a copy-paste evidence block.
+[the deployed verification page](https://gjstockham.github.io/traveller-mainworld/verify.html)
+— the same static page the matrix cells drive, running the same battery and the
+same fixture worlds, printing PASS/FAIL, both digests, the fixture-set hash and a
+copy-paste evidence block.
+
+It is published by `.github/workflows/pages.yml` on every push to `main`, and
+only after `pnpm golden:verify` passes in the same job, so a build that already
+disagrees with the manifests never reaches a borrowed device. Each deploy stamps
+its commit into the evidence block: a result that cannot be mapped back to a
+commit is a tick rather than evidence.
 Results and method live in
 [docs/evidence/wp4-manual-checks.md](docs/evidence/wp4-manual-checks.md).
 

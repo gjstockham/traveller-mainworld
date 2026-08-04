@@ -40,6 +40,17 @@ import { type Manifest, compareToManifest, formatMismatches } from '../src/manif
 import type { RunSizeName, StartRequest, WorkerMessage } from './protocol.js';
 
 const manifest = manifestJson as Manifest;
+
+/**
+ * The commit this bundle was built from, injected by the Pages workflow.
+ *
+ * An evidence block that cannot be tied back to a commit is weak evidence: the
+ * generator version and both digests say *what* was run, and this says *which
+ * build of it*. `local build` when served from a working tree, which is itself
+ * information — a hand-check pasted from a local build is not reproducible by
+ * anyone else.
+ */
+const BUILD_COMMIT: string = import.meta.env['VITE_COMMIT'] ?? 'local build';
 const fixtureManifest = fixtureManifestJson as FixtureManifest;
 
 /**
@@ -58,6 +69,8 @@ export interface VerifyReport {
   readonly manifestVersion: string;
   readonly size: RunSizeName;
   readonly workers: number;
+  /** Commit the bundle was built from, or `local build`. */
+  readonly buildCommit: string;
 
   /** Determinism battery, against `manifest.json`. */
   readonly digest: string;
@@ -166,6 +179,7 @@ function evidenceBlock(report: Omit<VerifyReport, 'evidence'>): string {
     ],
     ['screen', `${String(screen.width)}×${String(screen.height)} @ ${String(devicePixelRatio)}`],
     ['run at', new Date().toISOString()],
+    ['build', report.buildCommit],
   ];
   if (report.fixtureBlocker !== undefined) {
     lines.push(['fixtures blocked', report.fixtureBlocker]);
@@ -359,6 +373,7 @@ function finish(
     manifestVersion: manifest.genVersion,
     size: sizeName,
     workers: workerCount,
+    buildCommit: BUILD_COMMIT,
     digest,
     expectedDigest: manifest.digest,
     cases: results,
@@ -417,6 +432,7 @@ function fail(message: string): void {
     manifestVersion: manifest.genVersion,
     size: sizeName,
     workers: workerCount,
+    buildCommit: BUILD_COMMIT,
     digest: '',
     expectedDigest: manifest.digest,
     cases: [],
@@ -436,8 +452,41 @@ function fail(message: string): void {
   window.__goldenReport = { ...partial, evidence };
 }
 
+/**
+ * Copy, or fall back to selecting the text and saying so.
+ *
+ * `navigator.clipboard` is secure-context only. Served over plain HTTP from a
+ * LAN address — the obvious way to reach a phone — it is `undefined`, and the
+ * previous `navigator.clipboard?.writeText(...)` swallowed that: the button did
+ * nothing, silently, while the instructions said "press Copy evidence and paste
+ * the block". A hand-check that cannot hand back its evidence is not a
+ * hand-check, and a control that fails without saying so is worse than one that
+ * is not there.
+ */
+function selectEvidence(): void {
+  const range = document.createRange();
+  range.selectNodeContents(evidenceEl);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+}
+
 copyButton.addEventListener('click', () => {
-  void navigator.clipboard?.writeText(evidenceEl.textContent ?? '');
+  const { clipboard } = navigator;
+  if (clipboard === undefined) {
+    selectEvidence();
+    copyButton.textContent = 'Selected — copy by hand (the clipboard API needs HTTPS)';
+    return;
+  }
+  void clipboard.writeText(evidenceEl.textContent ?? '').then(
+    () => {
+      copyButton.textContent = 'Copied';
+    },
+    () => {
+      selectEvidence();
+      copyButton.textContent = 'Selected — copy by hand (the clipboard was refused)';
+    },
+  );
 });
 
 if (sizeName === 'quick') {
