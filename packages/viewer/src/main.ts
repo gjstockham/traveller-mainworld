@@ -178,6 +178,7 @@ function main(): void {
     renderer.render(scene, camera);
 
     const stats = store.stats();
+    const buffers = planet.bufferBytes;
     overlay.update(
       {
         frameMs,
@@ -196,6 +197,11 @@ function main(): void {
         bytesTransferred: stats.bytesTransferred,
         altitudeKm: orbit.altitudeAboveSurface * world.spec.radiusKm,
         maxDepth,
+        cacheBytes: stats.cache.bytes,
+        meshLiveBytes: buffers.live,
+        meshPooledBytes: buffers.pooled,
+        meshSharedBytes: buffers.shared,
+        pooledMeshes: planet.pooledCount,
       },
       now,
     );
@@ -203,8 +209,10 @@ function main(): void {
     requestAnimationFrame(frame);
   };
 
-  // Ignore the startup burst when reporting the worst frame.
-  window.setTimeout(() => overlay.resetWorst(), 3000);
+  // Ignore the startup burst when reporting the worst frame, and take the heap
+  // baseline here rather than at load: the memory criterion asks whether a long
+  // session drifts, not what the page costs to open.
+  window.setTimeout(() => overlay.markSettled(performance.now()), 3000);
 
   document.title = `Traveller Mainworld — ${label}`;
   requestAnimationFrame(frame);

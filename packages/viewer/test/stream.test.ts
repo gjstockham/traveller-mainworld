@@ -164,6 +164,36 @@ describe('TileCache', () => {
   it('rejects a nonsensical capacity', () => {
     expect(() => new TileCache<string>(0)).toThrow(/capacity/);
   });
+
+  it('reports zero bytes when no sizeOf is supplied, rather than guessing', () => {
+    const c = new TileCache<string>(4);
+    c.set(1, V, 'a');
+    expect(c.stats().bytes).toBe(0);
+  });
+
+  it('tracks resident bytes across insert, overwrite and evict', () => {
+    const size = (v: Uint8Array): number => v.byteLength;
+    const c = new TileCache<Uint8Array>(2, undefined, size);
+
+    c.set(1, V, new Uint8Array(100));
+    expect(c.stats().bytes).toBe(100);
+
+    c.set(2, V, new Uint8Array(50));
+    expect(c.stats().bytes).toBe(150);
+
+    // Overwriting a key must not double-count the key it replaced.
+    c.set(1, V, new Uint8Array(10));
+    expect(c.stats().bytes).toBe(60);
+
+    // Eviction has to give the bytes back, or the total only ever climbs —
+    // which would make a bounded cache look exactly like a leak.
+    c.set(3, V, new Uint8Array(5));
+    expect(c.stats().size).toBe(2);
+    expect(c.stats().bytes).toBe(15);
+
+    c.clear();
+    expect(c.stats().bytes).toBe(0);
+  });
 });
 
 /**
@@ -350,6 +380,30 @@ describe('TileStore', () => {
     expect(s.generated).toBe(2);
     expect(s.meanGenerateMs).toBeCloseTo(5, 6);
     expect(s.bytesTransferred).toBeGreaterThan(0);
+  });
+
+  it('resident bytes plateau at capacity while transferred bytes keep climbing', () => {
+    // The distinction the 10-minute memory criterion turns on: a long session
+    // moves unbounded bytes through a bounded cache. If these two numbers
+    // tracked each other, the panel could not tell a leak from normal use.
+    const capacity = 4;
+    const store = makeStore(1, capacity);
+    const ids = tiles(10);
+    let perTile = 0;
+    for (const id of ids) {
+      store.request([id], () => 0);
+      FakeWorker.all[0]!.complete();
+      const s = store.stats();
+      if (perTile === 0) {
+        perTile = s.cache.bytes;
+        expect(perTile).toBeGreaterThan(0);
+      }
+      expect(s.cache.bytes).toBe(Math.min(s.cache.size, capacity) * perTile);
+    }
+    const final = store.stats();
+    expect(final.cache.size).toBe(capacity);
+    expect(final.cache.bytes).toBe(capacity * perTile);
+    expect(final.bytesTransferred).toBe(ids.length * perTile);
   });
 
   it('survives a worker error without stalling the pipeline', () => {

@@ -6,6 +6,25 @@
  * Spike B worker-throughput numbers are all read off this panel. Building it
  * now means those measurements come from the running system rather than a
  * separate harness that might not match.
+ *
+ * **What the memory readout can and cannot see.** Two independent numbers, for
+ * a reason:
+ *
+ * - `performance.memory` is the main thread's JS heap. It is **non-standard and
+ *   Chrome-only** — the panel says so where it is missing rather than showing a
+ *   zero that reads like a measurement — its values are quantised, and it does
+ *   **not** include worker heaps. Tile generation happens in workers, so the
+ *   number that looks most like "how much memory is this using" is precisely
+ *   the one that cannot see the generator.
+ * - Resident bytes are counted, not sampled: the tile cache sums what it holds,
+ *   the renderer sums its vertex and index buffers. Those cover the allocations
+ *   a streaming viewer would leak, and they are exact.
+ *
+ * Neither alone answers "memory stable over a 10-minute session". Together, a
+ * flat resident count with a rising heap points at the main thread, and a rising
+ * resident count points at the cache or the mesh pool. That is why both are
+ * here, and why the drift figure is against a baseline taken *after* startup
+ * rather than against zero.
  */
 
 export interface FrameSample {
@@ -25,10 +44,92 @@ export interface FrameSample {
   readonly bytesTransferred: number;
   readonly altitudeKm: number;
   readonly maxDepth: number;
+  /** Bytes held by cached tiles. */
+  readonly cacheBytes: number;
+  /** Vertex-buffer bytes for meshes currently drawn. */
+  readonly meshLiveBytes: number;
+  /** Vertex-buffer bytes for retired meshes held for reuse. */
+  readonly meshPooledBytes: number;
+  /** Index buffers, shared across every mesh and counted once. */
+  readonly meshSharedBytes: number;
+  /** Retired meshes in the pool. Bounded — an unbounded rise is the bug. */
+  readonly pooledMeshes: number;
+}
+
+/** The Chrome-only shape of `performance.memory`. */
+interface JsHeapInfo {
+  readonly usedJSHeapSize: number;
+  readonly jsHeapSizeLimit: number;
+}
+
+/**
+ * Main-thread JS heap, or `undefined` where the browser does not expose it.
+ *
+ * Feature-detected on the property rather than the browser: Firefox and Safari
+ * have no `performance.memory` at all, and a build that gains one later should
+ * start reporting without a code change.
+ */
+function readJsHeap(): JsHeapInfo | undefined {
+  if (typeof performance === 'undefined') {
+    return undefined;
+  }
+  const memory = (performance as Performance & { memory?: Partial<JsHeapInfo> }).memory;
+  if (typeof memory?.usedJSHeapSize !== 'number' || typeof memory.jsHeapSizeLimit !== 'number') {
+    return undefined;
+  }
+  return { usedJSHeapSize: memory.usedJSHeapSize, jsHeapSizeLimit: memory.jsHeapSizeLimit };
 }
 
 /** Rolling window for frame timing, long enough to smooth without hiding stalls. */
 const WINDOW = 120;
+
+/** Heap reading and the moment it was taken, for the drift figure. */
+export interface HeapBaseline {
+  readonly usedBytes: number;
+  readonly atMs: number;
+}
+
+/**
+ * The memory block, as pure text.
+ *
+ * Separated from the DOM so the thing the exit criteria are read off can be
+ * tested directly — in particular that a browser without `performance.memory`
+ * produces a sentence saying so, and never a zero.
+ */
+export function memoryLines(
+  sample: Pick<
+    FrameSample,
+    | 'cacheBytes'
+    | 'cacheSize'
+    | 'meshLiveBytes'
+    | 'meshPooledBytes'
+    | 'meshSharedBytes'
+    | 'pooledMeshes'
+  >,
+  heap: JsHeapInfo | undefined,
+  baseline: HeapBaseline | undefined,
+  sessionMs: number,
+): string[] {
+  let heapLine: string;
+  if (heap === undefined) {
+    heapLine = 'not reported — performance.memory is Chrome-only';
+  } else {
+    const drift =
+      baseline === undefined
+        ? ''
+        : `  ${formatSigned(heap.usedJSHeapSize - baseline.usedBytes)} over ${formatDuration(sessionMs - baseline.atMs)}`;
+    heapLine = `${formatBytes(heap.usedJSHeapSize)} / ${formatBytes(heap.jsHeapSizeLimit)} main thread only${drift}`;
+  }
+
+  return [
+    `heap     ${heapLine}`,
+    `resident ${formatBytes(sample.cacheBytes)} tiles (${sample.cacheSize}), ` +
+      `${formatBytes(sample.meshLiveBytes)} mesh live, ` +
+      `${formatBytes(sample.meshPooledBytes)} pooled (${sample.pooledMeshes}), ` +
+      `${formatBytes(sample.meshSharedBytes)} shared`,
+    `session  ${formatDuration(sessionMs)}`,
+  ];
+}
 
 export class DiagnosticsOverlay {
   private readonly element: HTMLPreElement;
@@ -38,6 +139,8 @@ export class DiagnosticsOverlay {
   private lastThroughputAt = 0;
   private tilesPerSecond = 0;
   private lastRenderAt = 0;
+  private startedAt: number | undefined;
+  private heapBaseline: HeapBaseline | undefined;
 
   constructor(parent: HTMLElement) {
     this.element = document.createElement('pre');
@@ -59,6 +162,7 @@ export class DiagnosticsOverlay {
   }
 
   update(sample: FrameSample, now: number): void {
+    this.startedAt ??= now;
     this.frameTimes.push(sample.frameMs);
     if (this.frameTimes.length > WINDOW) {
       this.frameTimes.shift();
@@ -101,12 +205,26 @@ export class DiagnosticsOverlay {
       '',
       `cache    ${sample.cacheSize}/${sample.cacheCapacity}  ${hitRate.toFixed(0)}% hit`,
       `xfer     ${formatBytes(sample.bytesTransferred)}`,
+      '',
+      ...memoryLines(sample, readJsHeap(), this.heapBaseline, now - (this.startedAt ?? now)),
     ].join('\n');
   }
 
-  /** Clear the worst-frame high-water mark, e.g. after startup settles. */
-  resetWorst(): void {
+  /**
+   * Startup is over: clear the worst-frame high-water mark and take the heap
+   * baseline the drift figure is measured against.
+   *
+   * Both belong to the same moment. A worst-frame mark that includes the first
+   * few seconds reports shader compilation, and a heap baseline taken at zero
+   * reports the cost of loading the page rather than the cost of running it —
+   * which is the question the 10-minute criterion asks.
+   */
+  markSettled(now: number): void {
     this.worstFrameMs = 0;
+    const heap = readJsHeap();
+    if (heap !== undefined) {
+      this.heapBaseline = { usedBytes: heap.usedJSHeapSize, atMs: now - (this.startedAt ?? now) };
+    }
   }
 
   dispose(): void {
@@ -142,4 +260,16 @@ function formatBytes(n: number): string {
     return `${(n / (1 << 20)).toFixed(1)} MiB`;
   }
   return `${(n / 1024).toFixed(0)} KiB`;
+}
+
+/** Byte delta with an explicit sign — the sign is the finding. */
+function formatSigned(n: number): string {
+  return `${n < 0 ? '-' : '+'}${formatBytes(Math.abs(n))}`;
+}
+
+function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return minutes === 0 ? `${seconds}s` : `${minutes}m ${String(seconds).padStart(2, '0')}s`;
 }

@@ -66,6 +66,33 @@ export class PlanetRenderer {
     return total;
   }
 
+  /** Retired meshes held for reuse. Bounded by `poolSize`; worth watching. */
+  get pooledCount(): number {
+    return this.pool.length;
+  }
+
+  /**
+   * Bytes held in vertex and index buffers, live and pooled.
+   *
+   * Reported separately from the tile cache because they are separate
+   * allocations with separate lifetimes: a tile can leave the cut (mesh pooled,
+   * still allocated) while staying cached, or be evicted from the cache while
+   * its mesh is live. The Spike C memory criterion needs both, and neither is
+   * derivable from a tile count — the pool grows to `poolSize` and then stops,
+   * which is exactly the shape a leak would *not* have.
+   *
+   * The sixteen shared index buffers are counted once, not once per mesh, since
+   * that is how they exist.
+   */
+  get bufferBytes(): { live: number; pooled: number; shared: number } {
+    let shared = 0;
+    for (const attribute of this.indexAttributes) {
+      shared += (attribute.array as ArrayBufferView).byteLength;
+    }
+    const perMesh = vertexCount(this.options.n) * 3 * Float32Array.BYTES_PER_ELEMENT * 2;
+    return { live: this.live.size * perMesh, pooled: this.pool.length * perMesh, shared };
+  }
+
   /**
    * Add or update the mesh for a generated tile.
    *

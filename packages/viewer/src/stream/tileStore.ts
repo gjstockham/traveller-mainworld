@@ -84,7 +84,11 @@ export class TileStore {
   private disposed = false;
 
   constructor(private readonly options: TileStoreOptions) {
-    this.cache = new TileCache<ReadyTile>(options.cacheCapacity ?? 512);
+    this.cache = new TileCache<ReadyTile>(
+      options.cacheCapacity ?? 512,
+      undefined,
+      (tile) => tile.positions.byteLength + tile.colours.byteLength,
+    );
 
     const count = options.workerCount ?? defaultWorkerCount();
     const create =

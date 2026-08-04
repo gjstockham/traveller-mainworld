@@ -17,6 +17,15 @@ export interface CacheStats {
   readonly hits: number;
   readonly misses: number;
   readonly evictions: number;
+  /**
+   * Bytes held by cached values, or 0 when no `sizeOf` was supplied.
+   *
+   * Counted rather than sampled, because the thing it answers — is memory
+   * stable over a long session — cannot be read off a tile count. Capacity
+   * bounds the count; it does not bound the bytes, since a tile's size depends
+   * on the grid resolution it was generated at.
+   */
+  readonly bytes: number;
 }
 
 /**
@@ -29,6 +38,7 @@ export class TileCache<T> {
   private hits = 0;
   private misses = 0;
   private evictions = 0;
+  private bytes = 0;
 
   /**
    * @param capacity Maximum tiles retained. Sized from the Spike B memory
@@ -36,10 +46,17 @@ export class TileCache<T> {
    *                 too large and a long session grows without bound.
    * @param onEvict  Called with each evicted value, so buffers can be returned
    *                 to a pool rather than left to the GC.
+   * @param sizeOf   Retained bytes for a value. Optional: without it the cache
+   *                 works exactly as before and reports 0 bytes. Called again
+   *                 on removal rather than remembered, which is exact only
+   *                 because it is a pure function of an immutable value — which
+   *                 tiles are. A `sizeOf` that could return a different answer
+   *                 for the same value would drift the running total.
    */
   constructor(
     private readonly capacity: number,
     private readonly onEvict?: (value: T, key: string) => void,
+    private readonly sizeOf?: (value: T) => number,
   ) {
     if (capacity < 1) {
       throw new RangeError(`cache capacity must be at least 1, got ${capacity}`);
@@ -76,10 +93,13 @@ export class TileCache<T> {
 
   set(tileId: number, genVersion: string, value: T): void {
     const key = TileCache.keyFor(tileId, genVersion);
-    if (this.map.has(key)) {
+    const previous = this.map.get(key);
+    if (previous !== undefined) {
       this.map.delete(key);
+      this.bytes -= this.sizeOf?.(previous) ?? 0;
     }
     this.map.set(key, value);
+    this.bytes += this.sizeOf?.(value) ?? 0;
     while (this.map.size > this.capacity) {
       const oldest = this.map.keys().next();
       if (oldest.done === true) {
@@ -87,6 +107,7 @@ export class TileCache<T> {
       }
       const evicted = this.map.get(oldest.value)!;
       this.map.delete(oldest.value);
+      this.bytes -= this.sizeOf?.(evicted) ?? 0;
       this.evictions++;
       this.onEvict?.(evicted, oldest.value);
     }
@@ -117,6 +138,7 @@ export class TileCache<T> {
       }
     }
     this.map.clear();
+    this.bytes = 0;
   }
 
   stats(): CacheStats {
@@ -126,6 +148,7 @@ export class TileCache<T> {
       hits: this.hits,
       misses: this.misses,
       evictions: this.evictions,
+      bytes: this.bytes,
     };
   }
 

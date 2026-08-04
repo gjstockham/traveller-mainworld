@@ -15,6 +15,19 @@ async function readOverlay(page: import('@playwright/test').Page): Promise<strin
   return (await page.locator('#app pre').innerText()).trim();
 }
 
+/**
+ * Wait for the overlay to exist *and* to have been written to.
+ *
+ * The element is created empty and repainted at most every 250 ms, so it can be
+ * visible with no text in it. `expect.poll` propagates an exception from its
+ * callback rather than retrying, so a `metric()` call landing in that window
+ * failed the run outright — a flake with nothing to do with what was under
+ * test. Waiting for the first line to appear removes the window.
+ */
+async function awaitOverlay(page: import('@playwright/test').Page): Promise<void> {
+  await expect(page.locator('#app pre')).toContainText('fps', { timeout: 20_000 });
+}
+
 function metric(overlay: string, label: string): number {
   const line = overlay.split('\n').find((l) => l.startsWith(label));
   if (line === undefined) {
@@ -39,7 +52,7 @@ test('boots, streams tiles and renders', async ({ page }) => {
   await page.goto('/');
 
   // The overlay only appears once the first frame has run.
-  await expect(page.locator('#app pre')).toBeVisible({ timeout: 20_000 });
+  await awaitOverlay(page);
 
   // Tiles must actually arrive — a globe with zero tiles is a black screen.
   await expect
@@ -59,11 +72,21 @@ test('boots, streams tiles and renders', async ({ page }) => {
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
   expect(box?.width ?? 0).toBeGreaterThan(100);
+
+  // The memory block is what the Spike C 10-minute criterion is read off, so
+  // "it renders in a real browser" is worth asserting rather than assuming.
+  // Resident bytes are counted by us and must be non-zero once tiles exist.
+  expect(metric(overlay, 'resident'), 'resident tile bytes').toBeGreaterThan(0);
+  // Chromium exposes performance.memory, so this leg must show a real reading
+  // and not the unavailable sentence — which is how the sentence itself stays
+  // honest rather than becoming what every browser prints.
+  expect(overlay, 'heap readout').toMatch(/^heap +\d/m);
+  expect(overlay).toContain('main thread only');
 });
 
 test('refines LOD as the camera zooms in', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('#app pre')).toBeVisible({ timeout: 20_000 });
+  await awaitOverlay(page);
   await expect
     .poll(async () => metric(await readOverlay(page), 'tiles'), { timeout: 30_000 })
     .toBeGreaterThan(5);
@@ -91,7 +114,7 @@ test('refines LOD as the camera zooms in', async ({ page }) => {
 
 test('keeps rendering while the camera orbits', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('#app pre')).toBeVisible({ timeout: 20_000 });
+  await awaitOverlay(page);
   await expect
     .poll(async () => metric(await readOverlay(page), 'tiles'), { timeout: 30_000 })
     .toBeGreaterThan(5);
@@ -126,7 +149,7 @@ test('renders a recognisable globe', async ({ page }) => {
   // ?debug preserves the WebGL drawing buffer; without it the buffer is
   // cleared once composited and reads back empty.
   await page.goto('/?debug=1');
-  await expect(page.locator('#app pre')).toBeVisible({ timeout: 20_000 });
+  await awaitOverlay(page);
   await expect
     .poll(async () => metric(await readOverlay(page), 'tiles'), { timeout: 30_000 })
     .toBeGreaterThan(20);
