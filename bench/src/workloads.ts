@@ -12,8 +12,21 @@ import {
   type TileGenOutput,
   type World,
   allocateTileOutput,
+  interpretText,
   makeTileId,
 } from '@traveller-mainworld/core';
+
+/**
+ * The UPP the benchmark world's non-terrain fields come from.
+ *
+ * The benchmark measures a Size-8 world (the spike plan's navigation target),
+ * but at 6371 km and 8000 m of relief — real Earth rather than the Cepheus
+ * Size 8 figures. Those two overrides stay, because the R13 budgets were
+ * measured against them; everything else the spec gained in WP9 comes from
+ * interpreting an airless Size 8 UPP, so there is one place rules knowledge
+ * lives and it is not here.
+ */
+const SYNTHETIC_UPP = 'X800000-0';
 
 /**
  * Terrain parameters for the representative Phase-1 tile: **10 octaves**, per
@@ -34,6 +47,7 @@ export const BENCH_FBM: FbmParams = Object.freeze({
 /** A Size-8 world, the spike plan's navigation target. */
 export const BENCH_WORLD: World = Object.freeze({
   spec: {
+    ...interpretText(SYNTHETIC_UPP),
     radiusKm: 6371,
     terrainAmplitudeM: 8000,
     fbm: BENCH_FBM,

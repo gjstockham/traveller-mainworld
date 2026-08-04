@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { GEN_VERSION } from '../src/index.js';
 import { DEFAULT_FBM } from '../src/kernel/fbm.js';
+import { interpretText } from '../src/ruleset/interpret.js';
 import { Material } from '../src/kernel/tilegen.js';
 import { makeTileId, rootTiles, tileChild } from '../src/kernel/tileid.js';
 import type { World } from '../src/spec.js';
@@ -9,6 +10,7 @@ import { TsTileGenerator } from '../src/tile/generator.js';
 
 const WORLD: World = {
   spec: {
+    ...interpretText('X800000-0'),
     radiusKm: 6371,
     terrainAmplitudeM: 8000,
     fbm: DEFAULT_FBM,

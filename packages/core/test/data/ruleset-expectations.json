@@ -1,0 +1,360 @@
+{
+  "cepheus-1": {
+    "name": "Cepheus Engine",
+    "rulesetHash": "1aee16af5a72464bffa47f0eba78727bc7f84ee2eafb10f30498c07f423d497f",
+    "upps": [
+      {
+        "upp": "X000000-0",
+        "specHash": "7d9024d78d13c1988ce5a8989f5759ee16f8e9dd720641ae1c7cf3bca0baa3ce",
+        "spec": {
+          "radiusKm": 400,
+          "surfaceGravityG": 0,
+          "atmosphere": {
+            "pressureBand": "none",
+            "pressureBar": 0,
+            "composition": "none"
+          },
+          "hydrographicCoverage": 0,
+          "hints": {
+            "temperatureBand": "extreme",
+            "iceLikelihood": 0,
+            "terrainRoughness": 0.02
+          },
+          "craters": {
+            "densityScale": 1,
+            "transitionDiameterKm": 320,
+            "regolithMaturity": 1
+          },
+          "terrainAmplitudeM": 8000,
+          "fbm": {
+            "octaves": 6,
+            "frequency": 0.6,
+            "amplitude": 1,
+            "lacunarity": 2,
+            "gain": 0.5
+          }
+        }
+      },
+      {
+        "upp": "X100000-0",
+        "specHash": "d8ff55de0aad6e1273f3835999c8c6ec6c4523ba028173fea55a77d3b569b0f3",
+        "spec": {
+          "radiusKm": 800,
+          "surfaceGravityG": 0.05,
+          "atmosphere": {
+            "pressureBand": "none",
+            "pressureBar": 0,
+            "composition": "none"
+          },
+          "hydrographicCoverage": 0,
+          "hints": {
+            "temperatureBand": "extreme",
+            "iceLikelihood": 0,
+            "terrainRoughness": 0.0175
+          },
+          "craters": {
+            "densityScale": 1,
+            "transitionDiameterKm": 64,
+            "regolithMaturity": 1
+          },
+          "terrainAmplitudeM": 14000,
+          "fbm": {
+            "octaves": 7,
+            "frequency": 0.8,
+            "amplitude": 1,
+            "lacunarity": 2,
+            "gain": 0.5
+          }
+        }
+      },
+      {
+        "upp": "X210000-1",
+        "specHash": "85158c25f9806616ed33095952bc95d64b4e77833514331926980f3627b64656",
+        "spec": {
+          "radiusKm": 1600,
+          "surfaceGravityG": 0.15,
+          "atmosphere": {
+            "pressureBand": "trace",
+            "pressureBar": 0.05,
+            "composition": "standard"
+          },
+          "hydrographicCoverage": 0,
+          "hints": {
+            "temperatureBand": "extreme",
+            "iceLikelihood": 0.125,
+            "terrainRoughness": 0.010625
+          },
+          "craters": {
+            "densityScale": 0.95,
+            "transitionDiameterKm": 21.333333333333336,
+            "regolithMaturity": 0.9746794344808963
+          },
+          "terrainAmplitudeM": 17000,
+          "fbm": {
+            "octaves": 8,
+            "frequency": 1,
+            "amplitude": 1,
+            "lacunarity": 2,
+            "gain": 0.5
+          }
+        }
+      },
+      {
+        "upp": "E340000-3",
+        "specHash": "3d5a56d093985b2e946a76913008fb824f97bd70821fc1dde24480efa7b26648",
+        "spec": {
+          "radiusKm": 2400,
+          "surfaceGravityG": 0.25,
+          "atmosphere": {
+            "pressureBand": "thin",
+            "pressureBar": 0.57,
+            "composition": "tainted"
+          },
+          "hydrographicCoverage": 0,
+          "hints": {
+            "temperatureBand": "cold",
+            "iceLikelihood": 0.225,
+            "terrainRoughness": 0.007916666666666667
+          },
+          "craters": {
+            "densityScale": 0.55,
+            "transitionDiameterKm": 12.8,
+            "regolithMaturity": 0.7416198487095663
+          },
+          "terrainAmplitudeM": 19000,
+          "fbm": {
+            "octaves": 9,
+            "frequency": 1.2,
+            "amplitude": 1,
+            "lacunarity": 2,
+            "gain": 0.5
+          }
+        }
+      },
+      {
+        "upp": "E4A0000-5",
+        "specHash": "a0dc997f91f463e41c927144f975210f64310a5c04ea05c06b15f5d006fd8b4a",
+        "spec": {
+          "radiusKm": 3200,
+          "surfaceGravityG": 0.35,
+          "atmosphere": {
+            "pressureBand": "standard",
+            "pressureBar": 1.1,
+            "composition": "exotic"
+          },
+          "hydrographicCoverage": 0,
+          "hints": {
+            "temperatureBand": "hot",
+            "iceLikelihood": 0,
+            "terrainRoughness": 0.00875
+          },
+          "craters": {
+            "densityScale": 0.2,
+            "transitionDiameterKm": 9.142857142857144,
+            "regolithMaturity": 0.4472135954999579
+          },
+          "terrainAmplitudeM": 28000,
+          "fbm": {
+            "octaves": 9,
+            "frequency": 1.4,
+            "amplitude": 1,
+            "lacunarity": 2,
+            "gain": 0.5
+          }
+        }
+      },
+      {
+        "upp": "D5D3333-6",
+        "specHash": "1621c9381fa5511c2b6083fac7a250a284b6cfed82f5f85688a1f1ee3d30207f",
+        "spec": {
+          "radiusKm": 4000,
+          "surfaceGravityG": 0.45,
+          "atmosphere": {
+            "pressureBand": "dense",
+            "pressureBar": 2,
+            "composition": "standard"
+          },
+          "hydrographicCoverage": 0.3,
+          "hints": {
+            "temperatureBand": "hot",
+            "iceLikelihood": 0,
+            "terrainRoughness": 0.0065
+          },
+          "craters": {
+            "densityScale": 0.06999999999999999,
+            "transitionDiameterKm": 7.111111111111112,
+            "regolithMaturity": 0.264575131106459
+          },
+          "terrainAmplitudeM": 26000,
+          "fbm": {
+            "octaves": 10,
+            "frequency": 1.6,
+            "amplitude": 1,
+            "lacunarity": 2,
+            "gain": 0.5
+          }
+        }
+      },
+      {
+        "upp": "C6E5544-7",
+        "specHash": "72ee0bf5074297fd078de2b32558439238d6ba0fe58145c5daca8334ff530f3e",
+        "spec": {
+          "radiusKm": 4800,
+          "surfaceGravityG": 0.7,
+          "atmosphere": {
+            "pressureBand": "thin",
+            "pressureBar": 0.57,
+            "composition": "standard"
+          },
+          "hydrographicCoverage": 0.5,
+          "hints": {
+            "temperatureBand": "temperate",
+            "iceLikelihood": 0.25,
+            "terrainRoughness": 0.005
+          },
+          "craters": {
+            "densityScale": 0.275,
+            "transitionDiameterKm": 4.571428571428572,
+            "regolithMaturity": 0.5244044240850758
+          },
+          "terrainAmplitudeM": 24000,
+          "fbm": {
+            "octaves": 10,
+            "frequency": 1.8,
+            "amplitude": 1,
+            "lacunarity": 2,
+            "gain": 0.5
+          }
+        }
+      },
+      {
+        "upp": "B7B7654-9",
+        "specHash": "bd5f26418f4edc56653f850550547000999feaf12d4acd1f76826a9eeb37b035",
+        "spec": {
+          "radiusKm": 5600,
+          "surfaceGravityG": 0.9,
+          "atmosphere": {
+            "pressureBand": "standard",
+            "pressureBar": 1.1,
+            "composition": "corrosive"
+          },
+          "hydrographicCoverage": 0.7,
+          "hints": {
+            "temperatureBand": "hot",
+            "iceLikelihood": 0,
+            "terrainRoughness": 0.00375
+          },
+          "craters": {
+            "densityScale": 0.045000000000000005,
+            "transitionDiameterKm": 3.555555555555556,
+            "regolithMaturity": 0.21213203435596428
+          },
+          "terrainAmplitudeM": 21000,
+          "fbm": {
+            "octaves": 11,
+            "frequency": 2,
+            "amplitude": 1,
+            "lacunarity": 2,
+            "gain": 0.5
+          }
+        }
+      },
+      {
+        "upp": "C867A69-8",
+        "specHash": "7255475d4f30f9b041527aaa6848786241b889d7d44a44c3abc58165c6b0c4e7",
+        "spec": {
+          "radiusKm": 6400,
+          "surfaceGravityG": 1,
+          "atmosphere": {
+            "pressureBand": "standard",
+            "pressureBar": 1.1,
+            "composition": "standard"
+          },
+          "hydrographicCoverage": 0.7,
+          "hints": {
+            "temperatureBand": "temperate",
+            "iceLikelihood": 0.25,
+            "terrainRoughness": 0.003125
+          },
+          "craters": {
+            "densityScale": 0.06000000000000001,
+            "transitionDiameterKm": 3.2,
+            "regolithMaturity": 0.24494897427831783
+          },
+          "terrainAmplitudeM": 20000,
+          "fbm": {
+            "octaves": 11,
+            "frequency": 2.2,
+            "amplitude": 1,
+            "lacunarity": 2,
+            "gain": 0.5
+          }
+        }
+      },
+      {
+        "upp": "A9C8876-B",
+        "specHash": "c912e6dd9c1ddaf0b869d76bdf5029e5ec76a8336914490557ae0f0f5614f028",
+        "spec": {
+          "radiusKm": 7200,
+          "surfaceGravityG": 1.25,
+          "atmosphere": {
+            "pressureBand": "standard",
+            "pressureBar": 1.1,
+            "composition": "insidious"
+          },
+          "hydrographicCoverage": 0.8,
+          "hints": {
+            "temperatureBand": "hot",
+            "iceLikelihood": 0,
+            "terrainRoughness": 0.0025
+          },
+          "craters": {
+            "densityScale": 0.029999999999999992,
+            "transitionDiameterKm": 2.56,
+            "regolithMaturity": 0.1732050807568877
+          },
+          "terrainAmplitudeM": 18000,
+          "fbm": {
+            "octaves": 12,
+            "frequency": 2.4,
+            "amplitude": 1,
+            "lacunarity": 2,
+            "gain": 0.5
+          }
+        }
+      },
+      {
+        "upp": "AAFACFF-F",
+        "specHash": "ffaf591861c1d2a2ae9bff1ba1cb9bc23de136b76e40f032d712447b2dde2bb7",
+        "spec": {
+          "radiusKm": 8000,
+          "surfaceGravityG": 1.4,
+          "atmosphere": {
+            "pressureBand": "unusual",
+            "pressureBar": 1.1,
+            "composition": "unusual"
+          },
+          "hydrographicCoverage": 1,
+          "hints": {
+            "temperatureBand": "temperate",
+            "iceLikelihood": 0.25,
+            "terrainRoughness": 0.002125
+          },
+          "craters": {
+            "densityScale": 0,
+            "transitionDiameterKm": 2.285714285714286,
+            "regolithMaturity": 0
+          },
+          "terrainAmplitudeM": 17000,
+          "fbm": {
+            "octaves": 12,
+            "frequency": 2.6,
+            "amplitude": 1,
+            "lacunarity": 2,
+            "gain": 0.5
+          }
+        }
+      }
+    ]
+  }
+}

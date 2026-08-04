@@ -84,6 +84,31 @@ export default tseslint.config(
     },
   },
   {
+    // The ruleset interpreter. **Not the kernel** — it may import freely, it
+    // has no typed-array obligation, and `scripts/check-kernel-whitelist.mjs`
+    // does not scan it. But its *arithmetic* reaches generated output just as
+    // surely: from WP10 the crater parameters it computes are read by the tile
+    // pass, and from WP14 the whole interpreted spec is hashed per golden
+    // fixture. A `Math.pow` here would be exactly as unportable as a
+    // `Math.pow` in `kernel/`, so the transcendental ban follows the numbers
+    // rather than the directory.
+    files: ['packages/core/src/ruleset/**/*.ts'],
+    rules: {
+      'no-restricted-properties': ['error', ...kernelRestrictedProperties],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'BinaryExpression[operator="**"]',
+          message: 'The ** operator resolves to Math.pow semantics. Use powi() from kernel/ops.ts.',
+        },
+        {
+          selector: 'AssignmentExpression[operator="**="]',
+          message: 'The **= operator resolves to Math.pow semantics. Use powi() from kernel/ops.ts.',
+        },
+      ],
+    },
+  },
+  {
     // Repo-level ESM tooling: CI checks, and the golden page's build driver.
     // Not bundled, not shipped, and Node globals are the point of them.
     files: ['**/*.config.js', 'scripts/**/*.mjs', 'packages/golden/*.mjs'],

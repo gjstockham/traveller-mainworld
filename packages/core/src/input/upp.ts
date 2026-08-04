@@ -36,10 +36,32 @@ export type StarportClass = 'A' | 'B' | 'C' | 'D' | 'E' | 'X';
  * The valid starport classes.
  *
  * The one position PRD §6.1 gives no range for, validated here anyway: a typed
- * `Z` is exactly the catchable typo the rest of this file exists to catch. Held
- * as one constant so WP9 can take ownership if starport classes turn out to
- * vary by ruleset — at which point this becomes a range check against the
- * ruleset's set rather than a hardcoded one.
+ * `Z` is exactly the catchable typo the rest of this file exists to catch.
+ *
+ * **WP9 decided this stays here** — the set of starport classes is an
+ * *encoding* fact, not a ruleset fact. Three reasons, in order of weight:
+ *
+ * 1. **Consistency with every other position.** `UPP_POSITIONS` already
+ *    hardcodes that Hydrographics stops at `A` and Government at `F`. Those
+ *    ceilings are Cepheus facts in exactly the same sense, and the header
+ *    above already draws the line where this file draws it: knowing the
+ *    *symbols* is knowing the encoding, knowing what they *mean* is not.
+ *    Moving one position across that line and leaving seven would make the
+ *    boundary arbitrary.
+ * 2. **`parseUpp` takes no ruleset, and should not.** Parsing has to work
+ *    before a ruleset is chosen — the viewer validates as the user types, and
+ *    `?ruleset=` is a separate URL parameter that may name a ruleset this
+ *    build does not have. A parser that needed a ruleset would either take one
+ *    or reach for a default, and the second is the silent-wrong-answer path.
+ * 3. **A ruleset with a different set is a different encoding.** If house
+ *    rules add an `F` starport, the string `F867A69-8` is a string this parser
+ *    should learn to read. That is a parser change, which is the honest place
+ *    for it, and the WP8 comment's "range check against the ruleset's set"
+ *    would have hidden it in a data table.
+ *
+ * The ruleset's obligation runs the other way: `cepheus-1` must have prose for
+ * every class listed here, and `describe.test.ts` asserts exactly that, so the
+ * two cannot drift apart.
  */
 export const STARPORT_CLASSES: readonly StarportClass[] = ['A', 'B', 'C', 'D', 'E', 'X'];
 

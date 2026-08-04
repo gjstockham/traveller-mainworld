@@ -10,6 +10,7 @@ import {
   type TileGenerator,
   TsTileGenerator,
   type World,
+  leafPaths,
   tileBounds,
   tileDepth,
   tileFace,
@@ -178,6 +179,69 @@ describe('the fixture-spec hash', () => {
       expect(text).toContain(`fbm.gain=${String(f.world.spec.fbm.gain)}`);
     }
     expect(text).toContain(`n=${String(FIXTURE_N)}`);
+  });
+});
+
+/**
+ * Fields of `PhysicalWorldSpec` that the fixture-spec hash deliberately does
+ * not cover, each with the phase that will change that.
+ *
+ * WP9 grew the spec to PRD R5's full field set — atmosphere, hydrographics,
+ * derived hints, crater parameters — while `serialiseFixtureSpecs` still names
+ * the three things Phase 0 generation reads. That is correct *today*: none of
+ * these reaches `generateTile`, so hashing them would move the fixture-spec
+ * hash for inputs no generator consumes.
+ *
+ * It stops being correct the moment one of them does. WP10 reads
+ * `craters.*`; Phase 2 reads `hydrographicCoverage` and `atmosphere.*`. A
+ * field that reaches generation without reaching this hash is a fixture set
+ * that cannot tell two different worlds apart — so the list below is an
+ * obligation, not a note, and the test under it fails on any spec field that
+ * is neither serialised nor listed here.
+ */
+const NOT_YET_GENERATED: Readonly<Record<string, string>> = {
+  surfaceGravityG: 'stored only; WP10 uses it via craters.transitionDiameterKm',
+  'atmosphere.pressureBand': 'Phase 2 (sky)',
+  'atmosphere.pressureBar': 'Phase 2 (sky)',
+  'atmosphere.composition': 'Phase 2 (sky, surface tinting)',
+  hydrographicCoverage: 'Phase 2 (R8 sea-level solve)',
+  'hints.temperatureBand': 'Phase 4 (climate)',
+  'hints.iceLikelihood': 'Phase 4 (climate)',
+  'hints.terrainRoughness': 'derived from radiusKm and terrainAmplitudeM, both hashed',
+  'craters.densityScale': 'WP10',
+  'craters.transitionDiameterKm': 'WP10',
+  'craters.regolithMaturity': 'WP10, WP11',
+};
+
+describe('the fixture-spec hash covers the whole spec', () => {
+  const spec = FIXTURES[0]!.world.spec;
+  const serialised = serialiseFixtureSpecs();
+
+  it('serialises, or explicitly excuses, every field of PhysicalWorldSpec', () => {
+    const unaccounted = leafPaths(spec).filter(
+      (path) => !serialised.includes(`${path}=`) && NOT_YET_GENERATED[path] === undefined,
+    );
+    expect(
+      unaccounted,
+      'A field was added to PhysicalWorldSpec without deciding whether the fixture-spec ' +
+        'hash covers it. Add it to serialiseFixtureSpecs (a fixture-spec change under the ' +
+        'change protocol) or to NOT_YET_GENERATED with the phase that will.',
+    ).toEqual([]);
+  });
+
+  it('does not excuse a field it actually serialises', () => {
+    // The other direction: an entry left in NOT_YET_GENERATED after the field
+    // it names started being hashed would be a stale claim in a file people
+    // read to find out what is covered.
+    const stale = Object.keys(NOT_YET_GENERATED).filter((path) =>
+      serialised.includes(`${path}=`),
+    );
+    expect(stale).toEqual([]);
+  });
+
+  it('names a real field in every excuse', () => {
+    const leaves = new Set(leafPaths(spec));
+    expect(Object.keys(NOT_YET_GENERATED).filter((path) => !leaves.has(path))).toEqual([]);
   });
 });
 

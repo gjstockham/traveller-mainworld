@@ -25,7 +25,13 @@
  * fallback to the default world: quietly rendering something else is exactly
  * how you convince yourself you have looked at a fixture when you have not.
  */
-import { DEFAULT_FBM, FIXTURES, type World, hashSeedString } from '@traveller-mainworld/core';
+import {
+  DEFAULT_FBM,
+  FIXTURES,
+  type World,
+  hashSeedString,
+  interpretText,
+} from '@traveller-mainworld/core';
 
 export interface WorldChoice {
   /** Shown in the title bar and the diagnostics overlay. */
@@ -43,6 +49,7 @@ export function defaultWorld(seedText: string): WorldChoice {
     fixtureId: undefined,
     world: {
       spec: {
+        ...interpretText('X200000-0'),
         radiusKm: 1737,
         terrainAmplitudeM: 7000,
         fbm: { ...DEFAULT_FBM, octaves: 10 },

@@ -1,4 +1,4 @@
-import { DEFAULT_FBM, type World, makeTileId } from '@traveller-mainworld/core';
+import { DEFAULT_FBM, type World, interpretText, makeTileId } from '@traveller-mainworld/core';
 import { describe, expect, it } from 'vitest';
 
 import { TileCache } from '../src/stream/cache.js';
@@ -250,7 +250,7 @@ class FakeWorker {
 }
 
 const WORLD: World = {
-  spec: { radiusKm: 1737, terrainAmplitudeM: 6000, fbm: DEFAULT_FBM },
+  spec: { ...interpretText('X200000-0'), radiusKm: 1737, terrainAmplitudeM: 6000, fbm: DEFAULT_FBM },
   seedHi: 1,
   seedLo: 2,
 };

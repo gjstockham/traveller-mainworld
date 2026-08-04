@@ -32,6 +32,61 @@ above is the copy that is, and the README repeats it.
 
 ## Unreleased
 
+### Ruleset interpretation (WP9)
+
+- **`cepheus-1` minted**, table digest `1aee16af5a72464b…`. The first ruleset:
+  Size, Atmosphere and Hydrographics tables plus plain-English prose for all
+  eight positions, assembled into a `PhysicalWorldSpec` by
+  `ruleset/interpret.ts`. First OGL-derived content in the repository — see
+  `LICENSE-OGL.txt` and the README's Licensing section for the split.
+
+- **A third identity, and its rule.** A ruleset id covers the interpretation
+  tables. **A table change mints a new id; it never bumps `GEN_VERSION` and
+  never edits an existing ruleset in place.** A share URL carries
+  `?ruleset=cepheus-1` (R27), so the id is a promise to a URL somebody else is
+  holding, and editing a digit under that name would silently change every
+  world ever shared with no version moving to say so. Enforced by
+  `pnpm ruleset:update`, which refuses to re-bless an id whose digest has
+  moved and prints the steps for minting a new one. The README carries the
+  rule in full, since the implementation plan it comes from is not in version
+  control.
+
+- **`GEN_VERSION` does not gain a ruleset component** (Phase 1 plan open
+  question 4, confirmed). Separate lifecycles, separate URL parameters.
+
+- **No output moved and no identity moved.** `GEN_VERSION` stays `0.1.0`, the
+  battery digest stays `0c6181a0…`, and the fixture set stays
+  `289a78e59ada7f5b…`. That last one is the load-bearing claim: the fixture
+  specs are now *interpreted* from airless UPPs (`X100000-0` … `XA00000-0`)
+  rather than hand-written, and they reproduce the Phase 0 values to the bit
+  because `cepheus-1`'s Size table adopts the amplitude curve the `289a78e5…`
+  set tuned against real bodies. The fBm parameters stay hand-written and
+  overridden — they are deliberate test-input diversity, not a physical claim,
+  and what regenerated fixtures do about that is WP14's call.
+
+  The coupling is deliberate: a ruleset table edit now also moves the
+  fixture-spec hash, which is §4.3's enforcement arriving early. Under the
+  "never edit in place" rule it cannot fire spuriously.
+
+- **`PhysicalWorldSpec` grew to PRD R5's full field set** — surface gravity,
+  atmospheric pressure band and composition class, hydrographic coverage,
+  derived hints, and Phase 1's crater parameters. All of it at once, because a
+  field that arrives in Phase 2 arrives with a fixture-hash change attached.
+  Most of it is stored and unused; `packages/golden/test/fixtures.test.ts`
+  now fails on any spec field that is neither covered by the fixture-spec hash
+  nor listed with the phase that will consume it.
+
+- **The interpreter is not the kernel, and its arithmetic still reaches a
+  hash.** `eslint.config.js` extends the banned-transcendental rule to
+  `ruleset/**`. The crater parameters it computes are read by tile generation
+  from WP10, so a `Math.pow` there would be exactly as unportable as one in
+  `kernel/`.
+
+- Starport class validation **stays in the parser** — an encoding fact, not a
+  ruleset fact, consistent with every other position's ceiling already living
+  on `UPP_POSITIONS`. Reasoning is in `input/upp.ts`; the ruleset's obligation
+  runs the other way and is tested.
+
 ### Golden fixtures
 
 - **Fixture set `289a78e59ada7f5b…`** (was `3ed32303b19de99a…`). Every

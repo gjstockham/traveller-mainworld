@@ -1,4 +1,4 @@
-import { FIXTURES, type PhysicalWorldSpec } from '@traveller-mainworld/core';
+import { FIXTURES, type PhysicalWorldSpec, interpretText } from '@traveller-mainworld/core';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -10,7 +10,10 @@ import {
   reliefRatio,
 } from '../src/render/exaggeration.js';
 
+// Only radius and relief matter to exaggeration; the rest of the spec comes
+// from an airless Size 8 UPP so this file holds no rules knowledge of its own.
 const spec = (radiusKm: number, terrainAmplitudeM: number): PhysicalWorldSpec => ({
+  ...interpretText('X800000-0'),
   radiusKm,
   terrainAmplitudeM,
   fbm: { octaves: 8, frequency: 1.6, amplitude: 1, lacunarity: 2, gain: 0.5 },

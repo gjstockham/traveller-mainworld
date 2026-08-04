@@ -30,7 +30,9 @@
     "golden:page": "pnpm build && pnpm --filter @traveller-mainworld/golden serve:web",
     "check:parity": "pnpm wasm:build && pnpm wasm:test && pnpm golden:parity",
     "bench": "pnpm --filter @traveller-mainworld/bench build && node --expose-gc bench/dist/cli.js",
-    "bench:quick": "pnpm --filter @traveller-mainworld/bench build && node --expose-gc bench/dist/cli.js --quick"
+    "bench:quick": "pnpm --filter @traveller-mainworld/bench build && node --expose-gc bench/dist/cli.js --quick",
+    "ruleset:update": "pnpm --filter @traveller-mainworld/core build && node scripts/update-ruleset-expectations.mjs",
+    "ruleset:check": "pnpm --filter @traveller-mainworld/core build && node scripts/update-ruleset-expectations.mjs --check"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

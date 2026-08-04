@@ -22,6 +22,7 @@ import {
   GEN_VERSION,
   type World,
   canonicalBytes,
+  interpretText,
   makeTileId,
   sha256Hex,
 } from '@traveller-mainworld/core';
@@ -87,6 +88,7 @@ export interface BatteryCase {
 /** The world used by the composite tile cases. Fixed, so hashes are stable. */
 const BATTERY_WORLD: World = {
   spec: {
+    ...interpretText('X800000-0'),
     radiusKm: 6371,
     terrainAmplitudeM: 8000,
     fbm: DEFAULT_FBM,

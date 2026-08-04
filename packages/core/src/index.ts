@@ -27,8 +27,21 @@ export * from './kernel/cubesphere.js';
 // interpreter rather than the kernel: nothing here reaches a golden hash.
 export * from './input/index.js';
 
+// The ruleset interpretation layer (PRD §6.2). Holds all rules knowledge, and
+// is the only thing in this package that knows what a UPP means.
+export * from './ruleset/index.js';
+
 // Generation surface.
-export type { PhysicalWorldSpec, World } from './spec.js';
+export type {
+  AtmosphereSpec,
+  CompositionClass,
+  CraterSpec,
+  DerivedHints,
+  PhysicalWorldSpec,
+  PressureBand,
+  TemperatureBand,
+  World,
+} from './spec.js';
 // The fixture worlds. Here rather than in the golden harness so that the worlds
 // the viewer can fly and the worlds the manifest pins are the same objects.
 export * from './fixtures.js';

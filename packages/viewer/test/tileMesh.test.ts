@@ -3,6 +3,7 @@ import {
   GEN_VERSION,
   TsTileGenerator,
   type World,
+  interpretText,
   makeTileId,
 } from '@traveller-mainworld/core';
 import { describe, expect, it } from 'vitest';
@@ -17,7 +18,7 @@ import {
 } from '../src/mesh/tileMesh.js';
 
 const WORLD: World = {
-  spec: { radiusKm: 1737, terrainAmplitudeM: 6000, fbm: DEFAULT_FBM },
+  spec: { ...interpretText('X200000-0'), radiusKm: 1737, terrainAmplitudeM: 6000, fbm: DEFAULT_FBM },
   seedHi: 0x1234,
   seedLo: 0x5678,
 };

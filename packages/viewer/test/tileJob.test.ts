@@ -38,6 +38,7 @@ import {
   type World,
   allocateTileOutput,
   instantiateWasmKernel,
+  interpretText,
   makeTileId,
 } from '@traveller-mainworld/core';
 import { describe, expect, it } from 'vitest';
@@ -49,7 +50,7 @@ import { runTileJob } from '../src/workers/tileJob.js';
 const GEN = '0.1.0';
 
 const WORLD: World = {
-  spec: { radiusKm: 1737, terrainAmplitudeM: 6000, fbm: DEFAULT_FBM },
+  spec: { ...interpretText('X200000-0'), radiusKm: 1737, terrainAmplitudeM: 6000, fbm: DEFAULT_FBM },
   seedHi: 0x1234abcd,
   seedLo: 0x89ef0176,
 };

@@ -1,0 +1,95 @@
+OPEN GAME LICENSE Version 1.0a
+==============================
+
+This file covers the Cepheus Engine-derived data tables in this repository.
+See README.md, section "Licensing", for the file-by-file split between this
+licence and the MIT licence that covers the code.
+
+
+-------------------------------------------------------------------------
+ACTION REQUIRED BEFORE ANY PUBLIC RELEASE  --  THIS FILE IS INCOMPLETE
+-------------------------------------------------------------------------
+
+The verbatim text of the Open Game License 1.0a MUST be pasted below, in
+place of this notice, before this repository is published anywhere.
+
+It is deliberately not reproduced from memory. Section 10 of the licence
+obliges you to include a copy of THE LICENCE with every copy of the Open
+Game Content you distribute, and a copy is only a copy if it is exact. A
+reconstruction that is 99% right is worse than an absent file, because it
+looks authoritative and is not.
+
+Get the text from an authoritative source -- the Cepheus Engine SRD's own
+copy, or the Open Gaming Foundation -- and paste it here unaltered, with
+no reformatting and no line rewrapping.
+
+Also verify the Section 15 declarations below against the Section 15 of
+the Cepheus Engine SRD you actually worked from. Section 15 must carry
+the FULL chain of every work you derived from, copied verbatim from that
+work, with your own line appended. The chain below is written from
+general knowledge of the Cepheus lineage and has NOT been checked against
+a copy of the SRD.
+
+-------------------------------------------------------------------------
+
+
+[ PASTE THE VERBATIM TEXT OF THE OPEN GAME LICENSE 1.0a HERE ]
+
+
+15. COPYRIGHT NOTICE
+--------------------
+
+(Verify this chain against the Cepheus Engine SRD's own Section 15 before
+release -- see the notice above.)
+
+Open Game License v 1.0a Copyright 2000, Wizards of the Coast, Inc.
+
+System Reference Document Copyright 2000-2003, Wizards of the Coast, Inc.;
+Authors Jonathan Tweet, Monte Cook, Skip Williams, Rich Baker, Andy Collins,
+David Noonan, Rich Redman, Bruce R. Cordell, John D. Rateliff, Thomas Reid,
+James Wyatt, based on original material by E. Gary Gygax and Dave Arneson.
+
+T20 - The Traveller's Handbook Copyright 2002, Quiklink Interactive, Inc.
+Traveller is a trademark of Far Future Enterprises and is used under license.
+
+Cepheus Engine System Reference Document, Copyright (c) 2016 Samardan Press;
+Author Jason "Flynn" Kemp.
+
+Traveller Mainworld, Copyright (c) 2026 Geoff Stockham.
+
+
+DESIGNATION OF OPEN GAME CONTENT
+--------------------------------
+
+The following files are Open Game Content. They contain game rule
+information -- codes, tables, and their meanings -- derived from the
+Cepheus Engine System Reference Document:
+
+  packages/core/src/ruleset/cepheus1/size.ts
+  packages/core/src/ruleset/cepheus1/atmosphere.ts
+  packages/core/src/ruleset/cepheus1/hydrographics.ts
+  packages/core/src/ruleset/cepheus1/prose.ts
+
+Within those files, the Open Game Content is the rules-derived data: the
+code-to-value mappings and the plain-English meanings of each code. The
+surrounding TypeScript -- type declarations, module structure, and the
+explanatory comments about this project's design decisions -- is not.
+
+Two columns in those tables are NOT derived from any ruleset and are not
+Open Game Content: `craterPreservation` and `baseTemperature` in the
+atmosphere table, and `terrainAmplitudeM`, `fbmFrequency` and `fbmOctaves`
+in the size table. They are this project's own invention and each file
+says so where it defines them.
+
+
+DESIGNATION OF PRODUCT IDENTITY
+-------------------------------
+
+No Product Identity is claimed by this project.
+
+"Traveller" is a registered trademark of Mongoose Publishing and is NOT
+licensed under the Open Game License. This project's use of the name rests
+on the Traveller fan-use tradition, not on this licence, and carries its
+own separate pre-release obligations -- see PRD section 5, and README.md
+section "Licensing". Those obligations (the site-wide disclaimer, and
+notifying the rights-holder) are NOT satisfied by this file.

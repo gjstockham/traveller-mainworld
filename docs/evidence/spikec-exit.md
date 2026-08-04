@@ -316,12 +316,79 @@ session  10m 50s
 
 ### Notes on what was seen
 
-**C2 — not recorded.** Awaiting a specific description; see the criteria section
-for what it needs.
+**C2 — not recorded.** Awaiting a specific description. The template below is
+what to fill in; it is blank, and a blank template is not a measurement.
 
 *(Free text. C2 lives here, and so does anything the panel cannot say — a
 hitch that felt wrong but did not trip the 1 s flag, a tile that arrived
 visibly late, a seam that appears only at a grazing sun angle.)*
+
+#### How to fly C2, and what the three answers are
+
+**The sun does not move, and there is no control for it.** `render/planet.ts`
+fixes one directional light at `(1, 0.35, 0.6)` normalised, and `main.ts` pins
+it to the world rather than the camera, so it stays put as you orbit. There is
+no `?sun=` parameter. **The sun angle is therefore chosen by where you fly**:
+orbit until the patch you want to inspect sits near the terminator, and the
+light is grazing; fly to the sub-solar point and it is flat.
+
+That matters, because the two conditions answer different questions. Grazing
+light near the terminator is what *reveals* a seam — a skirt wall is near-radial
+and catches low light, and a normal discontinuity throws a hard line. Flat
+sub-solar light hides all of it. **Inspect near the terminator.** A "no seams"
+observation made at the sub-solar point is close to worthless and should say
+which it was.
+
+**Which LOD boundaries.** A boundary is wherever a coarse tile abuts a finer
+one, which is the ring around wherever the camera is looking as you descend.
+The overlay's `tiles N visible, depth D` gives the depth at the centre of view,
+so the ring you are looking at is the `D-1 / D` pair. Descend slowly through
+several, and write down the pairs you actually stopped and looked at — "depths
+4/5, 5/6 and 6/7" is an answer; "all of them" is not.
+
+**Cube-edge versus LOD seam.** Twelve cube-face edges are skirted
+unconditionally today (README, "Skirts and seams"), because cross-face
+adjacency needs a rotation table the viewer does not carry, so **a faint seam
+along a cube edge is expected and is not a finding**. To tell them apart: pull
+back to orbit first and note where the six face boundaries run across the globe
+— at depth 0 those *are* the twelve cube edges — then descend deliberately, once
+along a face boundary and once through the middle of a face. A seam in the
+face interior is a finding; a seam on the boundary is the known limitation.
+
+If you find one that is not on a cube edge, **note the depth pair** — per "If a
+criterion fails" item 5, it means the skirt depth or the neighbour mask is wrong
+for that pair, and the pair is the first thing anyone debugging it will want.
+
+#### C2 — fill this in
+
+```
+Build (commit):        ____________
+Machine / browser:     ____________          (same laptop as the blocks above?)
+Fixture:               ____________
+Exaggeration:          ____________          (1 unless there is a reason)
+
+LOD boundaries inspected (depth pairs):
+                       ____________
+
+Sun angle at inspection:
+                       ____________          (near terminator / sub-solar / other)
+
+Cube-face edges — seam visible?      yes / no
+   distinguishable from LOD seams?   yes / no / did not compare
+   how it was told apart:            ____________
+
+Face interior — seam at any LOD boundary?   yes / no
+   if yes, depth pair(s):            ____________
+   description:                      ____________
+
+Verdict:               PASS / FAIL / still not measured
+```
+
+Two answers that are both fine to record: "no seam at any of depths 4/5, 5/6,
+6/7 in the face interior at grazing light; faint expected line on the cube
+edges" is a **PASS**. So is "did not get a grazing-light look at the face
+interior" — that is **still not measured**, honestly recorded, and it is a
+better entry than a PASS that rests on a sub-solar flypast.
 
 ### A number worth carrying forward
 

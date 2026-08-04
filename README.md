@@ -10,6 +10,8 @@ A browser-based tool that turns a Universal Planetary Profile (UPP) plus a seed 
 |---|---|
 | `packages/core` | Headless deterministic generation. Zero rendering dependencies. |
 | `packages/core/src/kernel` | **The whitelisted zone** — see below. |
+| `packages/core/src/input` | UPP parsing and seed handling. No rules knowledge. |
+| `packages/core/src/ruleset` | `(UPP, ruleset) → PhysicalWorldSpec`. **All** rules knowledge, and the only OGL content. |
 | `packages/viewer` | Three.js cube-sphere viewer (Vite). |
 | `packages/golden` | Golden-hash battery, fixture worlds, manifests and runners. |
 | `crates/kernel-wasm` | Rust→wasm32 twin of the kernel. Must hash identically to it. |
@@ -367,6 +369,79 @@ Which kernel the viewer runs is written down in exactly one place,
 job path and compares the renderer-ready buffers, so "the choice stays revisable"
 is a tested claim rather than a comment.
 
+## Ruleset identity
+
+The interpretation layer (`packages/core/src/ruleset`) turns a UPP into a
+`PhysicalWorldSpec`. It ships one ruleset, **`cepheus-1`**, and that id is a
+third identity alongside the two the change protocol already names:
+
+| Identity | Covers | Moves when | Lives in |
+|---|---|---|---|
+| `GEN_VERSION` | `packages/core` generation arithmetic | the kernel's maths changes | `core/index.ts` |
+| **Ruleset id** (`cepheus-1`) | the interpretation tables | *never* — see below | `core/src/ruleset/cepheus1/` |
+| Fixture-spec hash | the golden fixture set's inputs | fixtures change | `packages/golden/fixtures.json` |
+
+**The rule: a change to a ruleset table mints a new id. It never bumps
+`GEN_VERSION`, and it never edits an existing ruleset in place.**
+
+A share URL carries `?ruleset=cepheus-1` (R27), so the id is a promise to a URL
+somebody else is holding. Editing one digit of a table under that name silently
+changes every world anyone has ever shared, and no version anywhere moves to say
+so. Minting `cepheus-2` instead costs one frozen data module and keeps every old
+URL correct forever — the same obligation R15 places on generator versions, and
+far cheaper to honour here because a ruleset is data rather than a code path.
+`RULESETS` therefore grows and never shrinks, and an unknown id fails loudly
+rather than falling back to the default.
+
+`GEN_VERSION` does **not** gain a ruleset component. They have separate
+lifecycles and both travel in the share URL as separate parameters.
+
+Three things enforce it:
+
+1. `pnpm ruleset:check` — and `packages/core/test/interpret.test.ts` — compare
+   `cepheus-1`'s table digest against `packages/core/test/data/ruleset-expectations.json`.
+2. `pnpm ruleset:update` **refuses to re-bless an id whose digest has moved**, and
+   prints the steps for minting a new one instead. Without that refusal the file
+   would be a snapshot that gets re-blessed whenever it goes red.
+3. The golden fixture specs are interpreted from UPPs, so a table edit also moves
+   the fixture-spec hash and reddens `golden:verify:fixtures`. From WP14 the
+   fixtures hash the interpreted spec directly.
+
+**The interpreter is not the kernel, and its arithmetic still reaches a hash.**
+The crater parameters it computes are read by tile generation, so
+`eslint.config.js` extends the banned-transcendental rule to `ruleset/**` — with
+the differences that the directory may import freely and `check-kernel-whitelist.mjs`
+does not scan it.
+
 ## Licensing
 
-Code is intended for MIT/Apache-2.0 release. Cepheus Engine-derived data tables carry their OGL obligations. "Traveller" is a registered trademark of Mongoose Publishing; this project is non-commercial and relies on the fan-use tradition — see PRD §5 for the conditions that must be met before any public release.
+Code is **MIT** ([`LICENSE`](LICENSE)). The Cepheus Engine-derived data tables are
+Open Game Content under the OGL 1.0a ([`LICENSE-OGL.txt`](LICENSE-OGL.txt)).
+
+| Path | Licence |
+|---|---|
+| Everything not listed below | MIT |
+| `packages/core/src/ruleset/cepheus1/size.ts` | OGL 1.0a — Open Game Content |
+| `packages/core/src/ruleset/cepheus1/atmosphere.ts` | OGL 1.0a — Open Game Content |
+| `packages/core/src/ruleset/cepheus1/hydrographics.ts` | OGL 1.0a — Open Game Content |
+| `packages/core/src/ruleset/cepheus1/prose.ts` | OGL 1.0a — Open Game Content |
+
+Within those four files the Open Game Content is the *rules-derived data* — the
+code-to-value mappings and the plain-English meaning of each code. The
+surrounding TypeScript is not, and neither are the columns that no ruleset has
+an opinion about (`craterPreservation` and `baseTemperature` on the atmosphere
+table; `terrainAmplitudeM`, `fbmFrequency` and `fbmOctaves` on the size table).
+Each file marks its own boundary. The assembler in `ruleset/interpret.ts` holds
+no table values and is MIT.
+
+**Two obligations are outstanding and both are pre-release, not pre-merge:**
+
+1. [`LICENSE-OGL.txt`](LICENSE-OGL.txt) **does not yet contain the licence text.**
+   OGL §10 requires an exact copy to travel with the content, so it must be pasted
+   from an authoritative source rather than reconstructed. Its Section 15 chain
+   also needs checking against the Cepheus SRD's own. The file says so at the top.
+2. "Traveller" is a registered trademark of Mongoose Publishing and is **not**
+   covered by the OGL. This project is non-commercial forever and relies on the
+   fan-use tradition, which requires the site-wide disclaimer and notifying the
+   rights-holder before any public release — PRD §5 has the conditions and the
+   fallback-name reserve.
