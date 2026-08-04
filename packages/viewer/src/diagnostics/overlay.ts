@@ -212,6 +212,7 @@ export class DiagnosticsOverlay {
   private lastRenderAt = 0;
   private startedAt: number | undefined;
   private heapBaseline: HeapBaseline | undefined;
+  private labelTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
     parent: HTMLElement,
@@ -321,19 +322,50 @@ export class DiagnosticsOverlay {
     void clipboard.writeText(text).then(
       () => {
         this.fallback.hidden = true;
-        this.button.textContent = 'Copied';
+        this.flash('Copied');
       },
-      () => {
-        this.offerSelection(text, 'the clipboard was refused');
+      (error: unknown) => {
+        // Chrome rejects with NotAllowedError when the document is not focused,
+        // which is a different problem from a refused permission and has a
+        // different fix. Saying "refused" for both sent someone looking in the
+        // wrong place.
+        const why =
+          error instanceof Error && /focus/i.test(error.message)
+            ? 'the window was not focused'
+            : 'the clipboard was refused';
+        this.offerSelection(text, why);
       },
     );
+  }
+
+  /**
+   * Say something on the button, then put the label back.
+   *
+   * A label that latches on 'Copied' is indistinguishable from a button that
+   * stopped working: the second press of a session produces no visible change,
+   * which is exactly how a ten-minute run ends with nothing recorded. Every
+   * press has to acknowledge itself.
+   */
+  private flash(message: string): void {
+    this.button.textContent = message;
+    if (this.labelTimer !== undefined) {
+      clearTimeout(this.labelTimer);
+    }
+    this.labelTimer = setTimeout(() => {
+      this.button.textContent = 'Copy evidence';
+      this.labelTimer = undefined;
+    }, 1500);
   }
 
   private offerSelection(text: string, why: string): void {
     this.fallback.value = text;
     this.fallback.hidden = false;
-    this.fallback.select();
-    this.button.textContent = `Selected — copy by hand (${why})`;
+    // Focus as well as select: `select()` alone does not reliably move focus,
+    // and an unfocused selection is one a Ctrl+C cannot copy — a fallback that
+    // does not fall back.
+    this.fallback.focus();
+    this.fallback.setSelectionRange(0, text.length);
+    this.button.textContent = `Selected — press Ctrl+C (${why})`;
   }
 
   update(sample: FrameSample, now: number): void {
@@ -407,6 +439,9 @@ export class DiagnosticsOverlay {
   }
 
   dispose(): void {
+    if (this.labelTimer !== undefined) {
+      clearTimeout(this.labelTimer);
+    }
     this.container.remove();
   }
 }

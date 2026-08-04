@@ -104,6 +104,19 @@ test('hands back a pasteable evidence block', async ({ page, context }) => {
 
   const copied = await page.evaluate(() => navigator.clipboard.readText());
 
+  // The label must go back, or a second press produces no visible change and is
+  // indistinguishable from a button that has stopped working — which is how a
+  // ten-minute session ends with nothing recorded.
+  //
+  // Bounded at 10 s for a 1.5 s timer, deliberately: the render loop starves
+  // setTimeout when the main thread is saturated, and under SwiftShader that
+  // reset was measured arriving at 4.0 s. The generosity is about the harness,
+  // not about the product — but it is also why the label reset exists at all
+  // rather than relying on the user noticing a fast flicker.
+  await expect(button).toHaveText('Copy evidence', { timeout: 10_000 });
+  await button.click();
+  await expect(button).toHaveText('Copied', { timeout: 5_000 });
+
   // The stamp: what produced the numbers.
   expect(copied).toContain('size8-earthlike');
   expect(copied).toContain('tile mesh');

@@ -139,7 +139,33 @@ The `session` clock and the heap baseline survive opening it afterwards.
 
 <!-- C1/C3/C4 — end of the descent -->
 ```
-NOT MEASURED
+world         fixture size8-earthlike — 6400 km radius, 20000 m relief, 8 octaves
+tile mesh     65² (TILE_N 64)
+exaggeration  1 (true scale)
+user agent    Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36
+hardware      cores 8, memory 32 GB
+screen        1920×1080 @ 1
+run at        2026-08-04T14:29:15.793Z
+build         15664dfce7b7f2500155cfcb3cbce2d55e1a25eb
+
+world    size8-earthlike  ·  build 15664df
+
+fps         60   (16.7 ms mean, 16.9 p95)
+worst       34 ms
+altitude 20.7 Mm
+
+tiles       60 visible, depth 3
+tris     503.8k
+queue        0 queued, 0/7 busy
+gen      0.0 tiles/s, 10.1 ms/tile
+cancel       4 dropped before start
+
+cache    512/512  100% hit
+xfer     77.5 MiB
+
+heap     120.4 MiB / 4.09 GiB main thread only  +63.7 MiB over 22s
+resident 55.6 MiB tiles (512), 6.5 MiB mesh live, 12.1 MiB pooled (111), 1.5 MiB shared
+session  25s
 ```
 
 <!-- C5 — ten minutes in -->
