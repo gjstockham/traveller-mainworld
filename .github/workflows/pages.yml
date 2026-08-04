@@ -61,14 +61,32 @@ jobs:
         env:
           VITE_COMMIT: ${{ github.sha }}
 
+      # The viewer, under /viewer/, so the ten fixture worlds can be flown from
+      # any device. `--base=./` because it is served from a subdirectory; that is
+      # a URL concern and touches no arithmetic, so `viewer-profile` in the
+      # build-invariance cell still mirrors how the viewer is bundled. Passed on
+      # the command line rather than in a vite.config, which would break that
+      # mirror and fail `pnpm lint:invariance`.
+      - run: pnpm --filter @traveller-mainworld/viewer exec vite build --base=./
+
+      - name: Assemble the site
+        run: |
+          mkdir -p site/viewer
+          cp -r packages/golden/dist-web/. site/
+          cp -r packages/viewer/dist/. site/viewer/
+          test -f site/verify.html
+          test -f site/viewer/index.html
+
       - uses: actions/configure-pages@v5
-      # The whole tree: `verify.html` at the root is the canonical page, and the
-      # `unminified/` and `viewer-profile/` build-invariance profiles come along
-      # so a real device can be pointed at those bundles too if a divergence
-      # ever needs narrowing down to the bundler.
+      # `verify.html` stays at the root: the M1-M3 evidence file cites that URL,
+      # and a hand-check link that moves is a hand-check that does not happen.
+      # The `unminified/` and `viewer-profile/` build-invariance profiles come
+      # along too, so a real device can be pointed at those bundles if a
+      # divergence ever needs narrowing down to the bundler rather than the
+      # engine.
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: packages/golden/dist-web
+          path: site
 
   deploy:
     needs: build

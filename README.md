@@ -73,6 +73,10 @@ ten golden fixture worlds:
          size9-large      sizeA-maximal
 ```
 
+Deployed at <https://gjstockham.github.io/traveller-mainworld/viewer/>, so a
+fixture is one URL away on any device — though note a phone GPU says nothing
+about Spike C's exit criteria, which are about the integrated-GPU laptop.
+
 Those are the same `World` objects `packages/golden/fixtures.json` pins — the
 specs live in `core`, not in the harness, so what you fly is what is hashed
 rather than a copy that could drift. An unknown id is refused with the list
