@@ -88,9 +88,32 @@ name, never from the user-agent string in the block.
 | 2026-08-03 | Local, Ubuntu 24.04 on WSL2 (kernel 6.18) | Chromium 151.0.7922.34, Firefox 153.0, WebKit 26.5 | **PASS** — battery digest `0c6181a0…` in all three. *Battery only: this run predates WP7, so it is not evidence about the fixture worlds.* |
 | 2026-08-04 | Local, Ubuntu 24.04 on WSL2 (kernel 6.18) | Chromium 151.0.7922.34, Firefox 153.0, WebKit 26.5 | **PASS** — both artefacts. Battery `0c6181a0…`, fixture set `3ed32303…`, fixture digest `9843cdd3…` in all three. Still one OS, and still not real Safari. |
 | 2026-08-04 | Local, `build-invariance` cell (chromium) | unminified and Vite-default bundles | **PASS** — both digests identical to the `matrix` bundle and to the committed manifests |
-| | GitHub Actions, ubuntu-latest | chromium / firefox / webkit | _pending first CI run_ |
-| | GitHub Actions, macos-latest | chromium / firefox / webkit | _pending first CI run_ |
-| | GitHub Actions, windows-latest | chromium / firefox / webkit | _pending first CI run_ |
+| 2026-08-04 | GitHub Actions, ubuntu-latest | Chromium 151.0.7922.34, Firefox 153.0, WebKit 26.5 | **PASS** — `0c6181a0…` / `9843cdd3…` in all three |
+| 2026-08-04 | GitHub Actions, macos-latest | Chromium 151.0.7922.34, Firefox 153.0, WebKit 26.5 | **PASS** — `0c6181a0…` / `9843cdd3…` in all three |
+| 2026-08-04 | GitHub Actions, windows-latest | Chromium 151.0.7922.34, Firefox 153.0, WebKit 26.5 | **PASS** — `0c6181a0…` / `9843cdd3…` in all three |
+
+**All nine cells, first run:** [run 30889635150](https://github.com/gjstockham/traveller-mainworld/actions/runs/30889635150),
+commit `d974800`. Every cell reported the same two digests — battery
+`0c6181a006c94e6173d93e842a77736015f7ccf49cdb6a3abf707ad47f08bdf7` and fixture
+`9843cdd31cf52ced1862d927638ff5e1eaf338c4cdcfa9757cca0c61bee5033d` — against the
+same fixture set `3ed32303…`. Per-cell evidence blocks are the run's
+`battery-<os>-<browser>` artefacts. `build-invariance` passed in the same run.
+
+Three engines now agree bit-for-bit across **three** operating systems, which
+clears PRD §9.1's two-OS bar. Two things this does **not** clear:
+
+- **M1–M3 below are still empty**, and ADR-0001's R1 needs them too. Playwright's
+  WebKit is not Safari, so nine green cells do not close Spike A on their own.
+  ADR-0001 stays **Provisional**.
+- The webkit cells on ubuntu and windows both report a **macOS** user agent, as
+  the note above warns. Their OS comes from the cell name. Do not read those two
+  artefacts as macOS coverage — macOS coverage is the `macos-latest` column.
+
+One cell in that run did fail: `test (windows-latest)`, on a `SyntaxError` in two
+unit-test files that import a repo-root `scripts/*.mjs`. It is a Vite module
+resolution problem on Windows, not a determinism finding — `pnpm golden:verify`
+was *skipped* in that job and never ran, so **Node-on-Windows hash equality is
+unobserved rather than disproven**, and the three Windows browser cells passed.
 
 ## Manual: real Safari, iOS and Android
 
