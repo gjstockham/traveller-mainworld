@@ -16,6 +16,12 @@ show.
 > the measuring; it is not a substitute for it. A criterion that was not measured
 > is recorded as **not measured** — never inferred from the four that were.
 
+> **Status, 2026-08-04:** C1, C3, C4 and C5 are measured and pass, on build
+> `e444dc8`. **C2 — seams and cracks — is not measured**, and it is the one
+> criterion no instrument can supply. Phase 0's exit therefore rests on it, the
+> same way ADR-0001's promotion rested on M1: fill it, or accept it on the record
+> with reasoning. Do not close Phase 0 by counting four out of five.
+
 ## What is measured, and with what
 
 Everything below is read off the diagnostics overlay in the viewer
@@ -92,30 +98,70 @@ meaningful against that class.
 
 | Field | Value |
 |---|---|
-| Machine | *(not recorded)* |
-| CPU / cores | *(not recorded)* |
-| GPU | *(not recorded)* |
-| OS / browser | *(not recorded)* |
-| Power | *(mains / battery)* |
-| Build (commit) | *(not recorded)* |
-| Fixture | *(e.g. `size8-earthlike`)* |
+| Machine | Windows laptop, the author's |
+| CPU / cores | 8 logical cores (7 workers + main thread) |
+| GPU | **not recorded** — see the note below; it is the one gap in C4's provenance |
+| OS / browser | Windows 10/11 x64, Chrome 150.0.0.0 |
+| Memory / screen | 32 GB, 1920×1080 @ 1 |
+| Power | *(not recorded)* |
+| Build (commit) | `e444dc8e02edf756aa23ca8d5c8e9158a29f36ad` |
+| Fixture | `size8-earthlike` — 6400 km radius, 20000 m relief, 8 octaves |
 | Tile mesh `TILE_N` | 64 (65² mesh — note that generation is hashed at 129²; see open question 1) |
+
+**On the GPU line.** C4 is written against "the integrated-GPU laptop", and the
+user agent cannot say which GPU rendered. The figures below are from the author's
+Windows laptop, which is the machine that phrase refers to, but the block cannot
+prove that by itself. Recorded as a gap rather than papered over: if C4 is ever
+questioned, this is the line to fill.
 
 ## Criteria
 
+All measurements from **block C** below (build `e444dc8`, 2026-08-04) unless
+stated. Blocks A and B are earlier runs, kept for what they show.
+
 | # | Criterion (spike plan §C.2) | Measured | Result |
 |---|---|---|---|
-| C1 | Fly full-disc orbit → close range over a Size-8 world, tiles streaming throughout | | **not measured** |
-| C2 | No visible crack or seam at any LOD boundary | | **not measured** |
-| C3 | No stall > 1 s | | **not measured** |
-| C4 | ~60 fps target, 30 fps floor, on the integrated-GPU laptop | | **not measured** |
-| C5 | Memory stable over a 10-minute session | | **not measured** |
+| C1 | Fly full-disc orbit → close range over a Size-8 world, tiles streaming throughout | Descended from 20.7 Mm (block A, ~3.2 radii, full disc) to **12.8 km altitude at depth 7**; 40 tiles visible, 363 cached, 39.4 MiB streamed, 100% hit rate, nothing queued or cancelled at rest | **PASS** |
+| C2 | No visible crack or seam at any LOD boundary | — | **not measured** |
+| C3 | No stall > 1 s | **Worst frame 18 ms** across an uninterrupted 10m 50s session (bare `session` line and no excluded frames ⇒ the tab never went hidden) | **PASS** |
+| C4 | ~60 fps target, 30 fps floor, on the integrated-GPU laptop | **60 fps mean (16.7 ms), 16.9 ms p95**, measured at depth 7 rather than at orbit | **PASS** |
+| C5 | Memory stable over a 10-minute session | Heap `+43.2 MiB` over 10m 47s against `39.4 MiB` tiles + `13.0 MiB` mesh resident; no allocation activity at rest. See the argument below | **PASS**, with a stated limitation |
 
-C2 is the one with no number attached, so it needs the most specific
-description: which LOD boundaries were inspected, at what sun angle, and whether
-the twelve cube-edge seams (open question 2) were distinguishable from LOD-level
-seams. Skirts are drawn unconditionally across cube-face edges today and a faint
-seam is *expected* there; a seam anywhere else is a finding.
+**C4 is met at the hard end.** 16.9 ms p95 at depth 7 with 335.6k triangles is
+the target rate, not the 30 fps floor, and it is measured at close range rather
+than at the orbit framing where there is least to draw.
+
+**C5 needs its argument written out**, because a single end-of-session sample
+cannot show a trend on its own:
+
+- Heap rose 43.2 MiB from a baseline taken 3 s after load. Over the same period
+  the cache filled to 363 tiles (39.4 MiB) and the renderer took 4.3 MiB of live
+  and 8.7 MiB of pooled mesh buffers — about 53.9 MiB of accounted allocation.
+  **The growth is explained by the working set filling, not unexplained drift.**
+- At rest the panel reports `gen 0.0 tiles/s`, `queue 0`, `cancel 0`: nothing was
+  being allocated during the soak.
+- Both resident figures are bounded by construction — cache capacity 512 tiles,
+  mesh pool 256 — and those bounds are unit-tested.
+- **Block B is the cross-check that matters.** A 17m 37s session on the previous
+  build drifted `+44.6 MiB`; this 10m 47s one drifted `+43.2 MiB`. 63% more
+  elapsed time produced 3% more drift, so growth tracks *work done* rather than
+  time — which is what distinguishes a working set from a leak.
+
+*The limitation, stated rather than glossed:* the panel reports drift against a
+baseline, not a series, so "grew during the descent then went flat" and "grew
+steadily throughout" are not distinguishable from one block. The three bullets
+above are what makes the first reading the better-supported one; a sampled trend
+would settle it outright and does not exist.
+
+**C2 is the one still open.** It is the criterion no instrument can supply, and
+it needs a specific description rather than an impression: which LOD boundaries
+were inspected, at what sun angle, and whether the twelve cube-edge seams (open
+question 2) were distinguishable from LOD-level seams. Skirts are drawn
+unconditionally across cube-face edges today and a faint seam is *expected*
+there; a seam anywhere else is a finding. The author's general impression that
+the fixtures look right is recorded in the project history but is deliberately
+**not** entered here as C2 — that is the exact substitution this file opens by
+refusing.
 
 ## Results
 
@@ -151,7 +197,12 @@ A block with hidden time in it is still usable evidence for C5 — but the numbe
 that matters is **active**, because nothing renders, streams or allocates while
 the tab is away.
 
-<!-- C1/C3/C4 — end of the descent -->
+### Block A — full-disc orbit, 25 s (context, not a criterion)
+
+Kept because it is the other end of C1's flight and the only record of the orbit
+framing. It does *not* evidence C1 on its own: `altitude 20.7 Mm` on a 6400 km
+world is about 3.2 radii, and `session 25s` is not a soak.
+
 ```
 world         fixture size8-earthlike — 6400 km radius, 20000 m relief, 8 octaves
 tile mesh     65² (TILE_N 64)
@@ -182,16 +233,103 @@ resident 55.6 MiB tiles (512), 6.5 MiB mesh live, 12.1 MiB pooled (111), 1.5 MiB
 session  25s
 ```
 
-<!-- C5 — ten minutes in -->
+### Block B — 17m 37s, and the instrument it broke
+
+**This block records a measurement failure, and is kept for that reason.** Read
+`worst 58532 ms <-- STALL > 1s` alongside `queue 0`, `gen 0.0 tiles/s` and a
+`16.9 p95`: nothing was running. `requestAnimationFrame` stops in a hidden tab,
+so the first frame back carried the whole background period in its delta, and the
+panel booked it as a stall. The criterion it appeared to fail is C3, so an
+instrument that cannot separate those two cannot answer C3 at all.
+
+Fixed in `e444dc8`, which excludes the resumed frame from the timing statistics
+and splits the session line into active and hidden. Block C is the re-run.
+
+Its memory figures stand and are cited above as C5's cross-check — nothing about
+the hidden tab affects the heap or resident readings.
+
 ```
-NOT MEASURED
+world         fixture size8-earthlike — 6400 km radius, 20000 m relief, 8 octaves
+tile mesh     65² (TILE_N 64)
+exaggeration  1 (true scale)
+user agent    Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36
+hardware      cores 8, memory 32 GB
+screen        1920×1080 @ 1
+run at        2026-08-04T15:21:42.983Z
+build         75c26ac75f4c85b0bcabbb8c5c8dd4af08ed0d1e
+
+world    size8-earthlike  ·  build 75c26ac
+
+fps         60   (16.7 ms mean, 16.9 p95)
+worst    58532 ms  <-- STALL > 1s
+altitude 12.8 km
+
+tiles       41 visible, depth 7
+tris     346.1k
+queue        0 queued, 0/7 busy
+gen      0.0 tiles/s, 10.1 ms/tile
+cancel       0 dropped before start
+
+cache    476/512  100% hit
+xfer     51.7 MiB
+
+heap     88.7 MiB / 4.09 GiB main thread only  +44.6 MiB over 17m 37s
+resident 51.7 MiB tiles (476), 4.5 MiB mesh live, 11.9 MiB pooled (110), 1.5 MiB shared
+session  17m 40s
+```
+
+### Block C — the record: C1, C3, C4, C5
+
+Uninterrupted: the `session` line is a bare duration and `worst` carries no
+excluded-frame note, which together mean the tab stayed visible for all 10m 50s.
+That is what makes `worst 18 ms` a number about the renderer.
+
+```
+world         fixture size8-earthlike — 6400 km radius, 20000 m relief, 8 octaves
+tile mesh     65² (TILE_N 64)
+exaggeration  1 (true scale)
+user agent    Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36
+hardware      cores 8, memory 32 GB
+screen        1920×1080 @ 1
+run at        2026-08-04T15:48:59.958Z
+build         e444dc8e02edf756aa23ca8d5c8e9158a29f36ad
+
+world    size8-earthlike  ·  build e444dc8
+
+fps         60   (16.7 ms mean, 16.9 p95)
+worst       18 ms
+altitude 12.8 km
+
+tiles       40 visible, depth 7
+tris     335.6k
+queue        0 queued, 0/7 busy
+gen      0.0 tiles/s, 10.9 ms/tile
+cancel       0 dropped before start
+
+cache    363/512  100% hit
+xfer     39.4 MiB
+
+heap     74.0 MiB / 4.09 GiB main thread only  +43.2 MiB over 10m 47s
+resident 39.4 MiB tiles (363), 4.3 MiB mesh live, 8.7 MiB pooled (80), 1.5 MiB shared
+session  10m 50s
 ```
 
 ### Notes on what was seen
 
+**C2 — not recorded.** Awaiting a specific description; see the criteria section
+for what it needs.
+
 *(Free text. C2 lives here, and so does anything the panel cannot say — a
 hitch that felt wrong but did not trip the 1 s flag, a tile that arrived
 visibly late, a seam that appears only at a grazing sun angle.)*
+
+### A number worth carrying forward
+
+`10.9 ms/tile` at 65², measured under real navigation rather than on a bench.
+R13's budget is 100 ms and ADR-0001's R4 reopens the kernel decision above it, so
+this is nine times inside the trigger — at 65² and for Phase 0's single fBm pass.
+Phase 1 adds crater passes and may want 129²; that is the headroom they eat into,
+and open question 1 is decided against this figure.
 
 ## If a criterion fails
 
