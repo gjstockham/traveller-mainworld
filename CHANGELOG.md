@@ -32,7 +32,50 @@ above is the copy that is, and the README repeats it.
 
 ## Unreleased
 
-Nothing yet.
+### Golden fixtures
+
+- **Fixture set `289a78e59ada7f5b…`** (was `3ed32303b19de99a…`). Every
+  `terrainAmplitudeM` retuned against real solar-system bodies. Ids, seeds and
+  fBm parameters are untouched, and `GEN_VERSION` does not move: this changes
+  what the fixtures *are*, not how the generator behaves, and no input a user can
+  reach produces different output.
+
+  The old figures were invented rather than derived, and looking at the rendered
+  worlds for the first time showed two problems. The small end carried far too
+  much relief — Size 1 at 3.0% of its radius, where the real bodies near that
+  size run 1.0% (Rhea) to 2.7% (Iapetus, and that is a freak equatorial ridge).
+  The large end carried too little: `size8-earthlike` had 8 km of relief at
+  Earth's radius, against Earth's actual 20 km, so it was the least Earth-like
+  entry in the set and `size7` was closer to Earth than the fixture named for it.
+
+  The underlying mistake was assuming absolute relief falls away with size. It
+  does not. Luna has 20 km, Mars 30 km, Earth 20 km, Venus 14 km — roughly flat
+  between 14 and 30 km across the whole range, because maximum relief is set by
+  material strength against gravity rather than by radius. Relief *as a fraction
+  of radius* falls, and only because the radius grows.
+
+  | Fixture | radius | relief was → now | ratio now | real anchor |
+  |---|---:|---:|---:|---|
+  | size1-rockball | 800 km | 24 → 14 km | 1.75% | between Rhea 1.0% and Iapetus 2.7% |
+  | size2-cinder | 1600 km | 30 → 17 km | 1.06% | Luna 1.15% |
+  | size3-ceres | 2400 km | 28 → 19 km | 0.79% | between Mercury 0.41% and Mars 0.86% |
+  | size4-luna | 3200 km | 26 → 28 km | 0.875% | Mars 0.86% |
+  | size5-mercury | 4000 km | 22 → 26 km | 0.65% | interpolated; no real body here |
+  | size6-mars | 4800 km | 21 → 24 km | 0.50% | interpolated toward Venus |
+  | size7-temperate | 5600 km | 16 → 21 km | 0.375% | just above Earth |
+  | size8-earthlike | 6400 km | 8 → 20 km | 0.3125% | Earth 0.31% |
+  | size9-large | 7200 km | 7 → 18 km | 0.25% | beyond Earth |
+  | sizeA-maximal | 8000 km | 6 → 17 km | 0.21% | beyond Earth |
+
+  The relief-to-radius spread narrows from 40× to 8× as a result. That is the
+  realistic figure, and it slightly reduces the set's value as a stress test —
+  recorded because it is a real cost, not a free improvement.
+
+  **Consequence for recorded evidence.** The fixture digest moves, so M3's
+  hand-check block in `docs/evidence/wp4-manual-checks.md` cites a digest that no
+  longer exists and needs re-running (about a minute on the device). The battery
+  digest `0c6181a0…` is untouched, so all twelve automated determinism cells and
+  every claim resting on kernel arithmetic remain valid.
 
 ## 0.1.0 — 2026-08-04
 

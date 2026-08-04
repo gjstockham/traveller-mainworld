@@ -50,11 +50,11 @@ export interface Fixture {
 export const FIXTURES: readonly Fixture[] = Object.freeze([
   {
     id: 'size1-rockball',
-    description: 'Smallest supported world. All-zero seed — the lane a mixer is most likely to collapse.',
+    description: 'Smallest supported world, ~1.75% relief — between Rhea (1.0%) and Iapetus (2.7%) at comparable radius. All-zero seed, the lane a mixer is most likely to collapse.',
     world: {
       spec: {
         radiusKm: 800,
-        terrainAmplitudeM: 24000,
+        terrainAmplitudeM: 14000,
         fbm: { octaves: 6, frequency: 0.8, amplitude: 1, lacunarity: 2, gain: 0.5 },
       },
       seedHi: 0x00000000,
@@ -63,11 +63,11 @@ export const FIXTURES: readonly Fixture[] = Object.freeze([
   },
   {
     id: 'size2-cinder',
-    description: 'Low gain: amplitude decays fast, so the deep octaves contribute near-nothing.',
+    description: 'Luna\'s regime: 1.06% relief against Luna\'s 1.15% at a similar radius. Low gain, so the deep octaves contribute near-nothing.',
     world: {
       spec: {
         radiusKm: 1600,
-        terrainAmplitudeM: 30000,
+        terrainAmplitudeM: 17000,
         fbm: { octaves: 8, frequency: 1.2, amplitude: 1, lacunarity: 2, gain: 0.45 },
       },
       seedHi: 0x00000000,
@@ -76,11 +76,11 @@ export const FIXTURES: readonly Fixture[] = Object.freeze([
   },
   {
     id: 'size3-ceres',
-    description: 'All-ones seed, the other end of the lane range.',
+    description: '0.79% relief. Between Mercury (0.41%, geologically dead) and Mars (0.86%) — a body with some history. All-ones seed.',
     world: {
       spec: {
         radiusKm: 2400,
-        terrainAmplitudeM: 28000,
+        terrainAmplitudeM: 19000,
         fbm: { octaves: 10, frequency: 1.6, amplitude: 1, lacunarity: 2, gain: 0.5 },
       },
       seedHi: 0xffffffff,
@@ -89,11 +89,11 @@ export const FIXTURES: readonly Fixture[] = Object.freeze([
   },
   {
     id: 'size4-luna',
-    description: 'Gain above 0.5 with high base frequency: rough terrain, wide elevation range.',
+    description: 'The Mars analogue: 0.875% against Mars\'s 0.86%, and the most absolute relief in the set, as Mars has in the solar system. Gain above 0.5 gives it the roughness to match.',
     world: {
       spec: {
         radiusKm: 3200,
-        terrainAmplitudeM: 26000,
+        terrainAmplitudeM: 28000,
         fbm: { octaves: 12, frequency: 2.2, amplitude: 1, lacunarity: 2, gain: 0.55 },
       },
       seedHi: 0x80000000,
@@ -102,11 +102,11 @@ export const FIXTURES: readonly Fixture[] = Object.freeze([
   },
   {
     id: 'size5-mercury',
-    description: 'Non-dyadic lacunarity — octave frequencies stop being exactly representable.',
+    description: '0.65%. No real analogue exists between Mars and Venus, so this interpolates. Non-dyadic lacunarity — octave frequencies stop being exactly representable.',
     world: {
       spec: {
         radiusKm: 4000,
-        terrainAmplitudeM: 22000,
+        terrainAmplitudeM: 26000,
         fbm: { octaves: 9, frequency: 1.9, amplitude: 1, lacunarity: 1.87, gain: 0.5 },
       },
       seedHi: 0x7fffffff,
@@ -115,11 +115,11 @@ export const FIXTURES: readonly Fixture[] = Object.freeze([
   },
   {
     id: 'size6-mars',
-    description: 'High gain and many octaves together: the largest fBm sums in the set.',
+    description: '0.50%, continuing the interpolation toward Venus. High gain and many octaves together: the largest fBm sums in the set.',
     world: {
       spec: {
         radiusKm: 4800,
-        terrainAmplitudeM: 21000,
+        terrainAmplitudeM: 24000,
         fbm: { octaves: 14, frequency: 2.5, amplitude: 1, lacunarity: 2, gain: 0.6 },
       },
       seedHi: 0xdeadbeef,
@@ -128,11 +128,11 @@ export const FIXTURES: readonly Fixture[] = Object.freeze([
   },
   {
     id: 'size7-temperate',
-    description: 'Non-dyadic lacunarity again, paired with low gain and an odd octave count.',
+    description: '0.375%, just above Earth. Non-dyadic lacunarity again, paired with low gain and an odd octave count.',
     world: {
       spec: {
         radiusKm: 5600,
-        terrainAmplitudeM: 16000,
+        terrainAmplitudeM: 21000,
         fbm: { octaves: 11, frequency: 3.1, amplitude: 1, lacunarity: 2.13, gain: 0.42 },
       },
       seedHi: 0x0badf00d,
@@ -141,11 +141,11 @@ export const FIXTURES: readonly Fixture[] = Object.freeze([
   },
   {
     id: 'size8-earthlike',
-    description: 'DEFAULT_FBM exactly, at Earth radius: the shipping default, pinned.',
+    description: 'Earth exactly: 6400 km and 20 km of relief is 0.3125%, against Earth\'s 0.31%. DEFAULT_FBM unaltered, so the shipping default is pinned here.',
     world: {
       spec: {
         radiusKm: 6400,
-        terrainAmplitudeM: 8000,
+        terrainAmplitudeM: 20000,
         fbm: { octaves: 8, frequency: 1.6, amplitude: 1, lacunarity: 2, gain: 0.5 },
       },
       seedHi: 0x9e3779b1,
@@ -154,11 +154,11 @@ export const FIXTURES: readonly Fixture[] = Object.freeze([
   },
   {
     id: 'size9-large',
-    description: 'Subdued relief on a large radius — the regime where elevation is small next to the datum.',
+    description: '0.25% — beyond Earth, where relief is small next to the datum and the surface reads as almost smooth.',
     world: {
       spec: {
         radiusKm: 7200,
-        terrainAmplitudeM: 7000,
+        terrainAmplitudeM: 18000,
         fbm: { octaves: 16, frequency: 4, amplitude: 1, lacunarity: 2, gain: 0.5 },
       },
       seedHi: 0x00000001,
@@ -167,11 +167,11 @@ export const FIXTURES: readonly Fixture[] = Object.freeze([
   },
   {
     id: 'sizeA-maximal',
-    description: 'MAX_OCTAVES exactly — the last octave before fbm3 starts clamping.',
+    description: 'Largest supported world at 0.21%, the subtlest relief in the set. MAX_OCTAVES exactly, the last octave before fbm3 starts clamping.',
     world: {
       spec: {
         radiusKm: 8000,
-        terrainAmplitudeM: 6000,
+        terrainAmplitudeM: 17000,
         fbm: { octaves: 24, frequency: 5.5, amplitude: 1, lacunarity: 2, gain: 0.5 },
       },
       seedHi: 0xa5a5a5a5,

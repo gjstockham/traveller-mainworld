@@ -59,11 +59,18 @@ describe('chooseWorld', () => {
 
   it('spans the size range, which is why flying them is worth anything', () => {
     // Spike C's exit criteria were only ever exercised against one hardcoded
-    // world. The reason to fly fixtures is that relief-to-radius varies by a
-    // large factor across them, which is where LOD and skirt maths can be wrong.
+    // world. The reason to fly fixtures is that relief-to-radius varies across
+    // them, which is where LOD and skirt maths can be wrong.
+    //
+    // The threshold was 10 when the specs were first written and the spread was
+    // 40×. Retuning them against real solar-system bodies narrowed it to ~8×,
+    // because real absolute relief is roughly flat at 14-28 km across this whole
+    // radius range rather than falling away. A narrower spread is the realistic
+    // one; it is recorded here so the next person to widen or narrow it has to
+    // mean it.
     const ratios = FIXTURES.map(
       (f) => f.world.spec.terrainAmplitudeM / (f.world.spec.radiusKm * 1000),
     );
-    expect(Math.max(...ratios) / Math.min(...ratios)).toBeGreaterThan(10);
+    expect(Math.max(...ratios) / Math.min(...ratios)).toBeGreaterThan(5);
   });
 });

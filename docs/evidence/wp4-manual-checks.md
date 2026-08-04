@@ -14,8 +14,8 @@ every hash plus both overall digests.
 
 **Generator version:** 0.1.0
 **Battery digest:** `0c6181a006c94e6173d93e842a77736015f7ccf49cdb6a3abf707ad47f08bdf7`
-**Fixture set:** `3ed32303b19de99ab3d80f17f46488579c78f3846c3928772f1aa511713dba50`
-**Fixture digest:** `9843cdd31cf52ced1862d927638ff5e1eaf338c4cdcfa9757cca0c61bee5033d`
+**Fixture set:** `289a78e59ada7f5bab4a7c26c99ae5af580b9e95fbcdca033dd02f499e0c701c`
+**Fixture digest:** `9c0f860316158247bfd1d58523cb8212b3b0faef6cd8cbb4f46265c9f9217387`
 
 > The battery digest is unchanged by WP7 and remains what it always was: the
 > identity of the *kernel arithmetic*. The fixture set is keyed separately —
@@ -217,6 +217,12 @@ any.
 ```
 
 <!-- M3 -->
+> **Superseded — needs re-running.** The fixture specs were retuned against real
+> solar-system bodies (see the CHANGELOG entry for fixture set
+> `289a78e59ada7f5b…`), so the fixture digest below no longer exists. The battery
+> half of this block is still valid; the fixture half is not. About a minute on
+> the same device to replace it.
+
 ```
 result          PASS
 generator       0.1.0
@@ -238,13 +244,15 @@ build           d65a07a85629aa0b1295bff91cc0bd09d025841f
 |---|---|---|---|---|---|---|
 | M1 | — | macOS | Safari | — | **not run** — no Mac available | — |
 | M2 | — | iOS | Safari | — | **not run** — untested by choice | — |
-| M3 | 412×915 @2.625, 8 cores / 8 GB | Android 10 | Chrome 150.0.0.0 | `0c6181a0…` / `9843cdd3…` | **PASS** (28.0 s) | 2026-08-04 |
+| M3 | 412×915 @2.625, 8 cores / 8 GB | Android 10 | Chrome 150.0.0.0 | `0c6181a0…` / ~~`9843cdd3…`~~ | **battery PASS, fixture half superseded** (28.0 s) | 2026-08-04 |
 
 ### What M3 adds, and what M1 and M2 leaving empty costs
 
 **M3 adds real hardware and a real mobile thermal profile on Arm**, from a build
 whose commit it names (`d65a07a…`). That is the first result from an actual
-device rather than a CI runner, and the first from an Arm CPU.
+device rather than a CI runner, and the first from an Arm CPU. *Its fixture half
+was superseded the same day by a fixture-spec retune; the battery half stands,
+and re-running it is a minute's work.*
 
 It does **not** broaden engine coverage. Android Chrome is V8, and V8 was
 already the best-covered engine here — the Node reference leg on three OSes plus

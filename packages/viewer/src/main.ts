@@ -15,21 +15,13 @@ import { DiagnosticsOverlay } from './diagnostics/overlay.js';
 import { skirtMaskFor } from './lod/neighbours.js';
 import { DEFAULT_LOD, type LodParams, selectTiles } from './lod/quadtree.js';
 import { skirtDepthFor } from './mesh/tileMesh.js';
+import { elevationScaleFor } from './render/exaggeration.js';
 import { PlanetRenderer, createScene } from './render/planet.js';
 import { TileStore } from './stream/tileStore.js';
 import { chooseWorld } from './world/choice.js';
 
 /** Planet radius in scene units. Everything else is expressed relative to this. */
 const RADIUS = 1;
-
-/**
- * Vertical exaggeration of terrain relief.
- *
- * True relief on a large world is ~0.1% of the radius — invisible. Every
- * planet renderer exaggerates; this is a viewer-side display choice and does
- * not touch generated data, so it cannot affect a golden hash.
- */
-const ELEVATION_EXAGGERATION = 30;
 
 /** Grid resolution per tile. 65² for now; Spike B decides 65 vs 129 on measurement. */
 const TILE_N = 64;
@@ -69,7 +61,9 @@ function main(): void {
   const controls = bindControls(canvas, orbit);
   const overlay = new DiagnosticsOverlay(app);
 
-  const elevationScale = ELEVATION_EXAGGERATION / (world.spec.radiusKm * 1000);
+  // Compressed rather than flat: see render/exaggeration.ts for why a single
+  // multiplier turned the small end of the fixture set into potatoes.
+  const elevationScale = elevationScaleFor(world.spec);
 
   const store = new TileStore({
     world,
