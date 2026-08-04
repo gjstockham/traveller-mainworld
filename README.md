@@ -83,6 +83,14 @@ rather than a copy that could drift. An unknown id is refused with the list
 rather than silently falling back to the default world, and `?seed=` is refused
 alongside `?fixture=` because a fixture's seed is part of what is pinned.
 
+Every world is framed from the **same absolute altitude** (15 000 km), not the
+same multiple of its own radius, so apparent size tracks real size: a Size 1
+rockball starts as a small disc and a Size A world nearly fills the frame. The
+camera used to start at 1.5 radii above whatever it was looking at, which made
+every world identical on screen and left the only evidence of scale in the
+overlay readout — throwing away the one thing a space-to-surface zoom exists to
+convey. Zoom does the rest.
+
 Terrain relief is exaggerated for display, because true relief is invisible at
 planetary scale — Earth's entire range, Marianas to Everest, is 0.31% of its
 radius. `render/exaggeration.ts` scales displayed relief with the square root of

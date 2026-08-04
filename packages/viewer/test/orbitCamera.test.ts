@@ -168,3 +168,55 @@ describe('OrbitCamera', () => {
     expect(cam.position).toEqual(before);
   });
 });
+
+describe('initial framing', () => {
+  it('starts where DEFAULT_ORBIT says, not at a hardcoded 1.5 radii', () => {
+    // The default preserves the old behaviour exactly, so nothing that relied
+    // on it moved when the option was introduced.
+    expect(new OrbitCamera(DEFAULT_ORBIT).altitudeAboveSurface).toBe(1.5);
+  });
+
+  it('honours an initial altitude derived from an absolute distance', () => {
+    // The point of the option: a fixed altitude in kilometres becomes a
+    // different multiple of radius for every world, so apparent size tracks
+    // real size instead of every world filling the frame identically.
+    const altitudeKm = 15_000;
+    const small = new OrbitCamera({ ...DEFAULT_ORBIT, initialAltitude: altitudeKm / 800 });
+    const large = new OrbitCamera({ ...DEFAULT_ORBIT, initialAltitude: altitudeKm / 8000 });
+    expect(small.altitudeAboveSurface).toBeCloseTo(18.75, 6);
+    expect(large.altitudeAboveSurface).toBeCloseTo(1.875, 6);
+
+    // Apparent angular radius is asin(r / distance), r = 1 scene unit. The radii
+    // differ by 10×, but the apparent sizes differ by ~7×, not 10×: asin is
+    // linear only for small angles, and the large world subtends 20° where the
+    // compression is real. Framing at a fixed altitude therefore understates the
+    // difference slightly — it does not invent one, which is what framing at a
+    // fixed multiple of radius did.
+    const apparent = (c: OrbitCamera): number => Math.asin(1 / c.distance);
+    const ratio = apparent(large) / apparent(small);
+    expect(ratio).toBeGreaterThan(6);
+    expect(ratio).toBeLessThan(8);
+
+    // And the thing being fixed: at a fixed multiple of radius they are equal.
+    const oldSmall = new OrbitCamera({ ...DEFAULT_ORBIT, initialAltitude: 1.5 });
+    const oldLarge = new OrbitCamera({ ...DEFAULT_ORBIT, initialAltitude: 1.5 });
+    expect(apparent(oldLarge) / apparent(oldSmall)).toBe(1);
+  });
+
+  it('is not clamped away by the retreat bound when a world is small', () => {
+    // maxAltitude defaults to 12 radii; a Size 1 world starts at 18.75. Without
+    // the caller raising the bound the camera would be pulled straight back to
+    // a framing that hides exactly the thing this is for.
+    const initialAltitude = 15_000 / 800;
+    const clamped = new OrbitCamera({ ...DEFAULT_ORBIT, initialAltitude });
+    const raised = new OrbitCamera({
+      ...DEFAULT_ORBIT,
+      initialAltitude,
+      maxAltitude: Math.max(DEFAULT_ORBIT.maxAltitude, initialAltitude * 3),
+    });
+    clamped.update(1 / 60);
+    raised.update(1 / 60);
+    expect(clamped.altitudeAboveSurface).toBeLessThan(initialAltitude);
+    expect(raised.altitudeAboveSurface).toBeCloseTo(initialAltitude, 6);
+  });
+});

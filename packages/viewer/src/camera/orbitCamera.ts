@@ -21,6 +21,17 @@ export interface Vec3 {
 export interface OrbitCameraOptions {
   /** Planet radius in scene units. */
   readonly radius: number;
+  /**
+   * Starting height above the surface, as a multiple of radius.
+   *
+   * A multiple rather than an absolute, to match the two bounds below — but the
+   * caller is expected to derive it from an *absolute* altitude, so that worlds
+   * of different sizes appear at different sizes. Framing every world at the
+   * same multiple of its own radius makes an 800 km rockball and an 8000 km
+   * world fill the viewport identically, which throws away the one thing a
+   * space-to-surface zoom exists to convey.
+   */
+  readonly initialAltitude: number;
   /** Closest approach, as a multiple of radius above the surface. */
   readonly minAltitude: number;
   /** Furthest retreat, as a multiple of radius above the surface. */
@@ -35,6 +46,7 @@ export interface OrbitCameraOptions {
 
 export const DEFAULT_ORBIT: OrbitCameraOptions = {
   radius: 1,
+  initialAltitude: 1.5,
   minAltitude: 0.002,
   maxAltitude: 12,
   // Retention per 60 Hz frame, ~0.23 s time constant: enough coast to feel
@@ -64,7 +76,7 @@ export class OrbitCamera {
   private zoomVelocity = 0;
 
   constructor(private readonly options: OrbitCameraOptions = DEFAULT_ORBIT) {
-    this.altitude = options.radius * 1.5;
+    this.altitude = options.radius * options.initialAltitude;
   }
 
   /** Distance from the planet centre. */

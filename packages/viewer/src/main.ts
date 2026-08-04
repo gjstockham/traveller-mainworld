@@ -26,6 +26,22 @@ const RADIUS = 1;
 /** Grid resolution per tile. 65² for now; Spike B decides 65 vs 129 on measurement. */
 const TILE_N = 64;
 
+/**
+ * Starting altitude above the surface, in kilometres — the same for every world.
+ *
+ * This is what makes size legible. The camera used to start at 1.5 radii above
+ * whatever it was looking at, so an 800 km rockball and an 8000 km world filled
+ * the viewport identically and the only evidence of scale was a number in the
+ * overlay. Framing from a fixed absolute distance instead makes apparent size
+ * track real size: across the fixture set the disc runs from about 12% of the
+ * frame at Size 1 to about 80% at Size A, a ratio of ten, which is the ratio of
+ * their radii.
+ *
+ * 15 000 km is chosen so the largest supported world is comfortably framed
+ * rather than overflowing. Zoom does the rest — that is what it is for.
+ */
+const INITIAL_ALTITUDE_KM = 15_000;
+
 function main(): void {
   const app = document.querySelector<HTMLDivElement>('#app');
   if (app === null) {
@@ -57,7 +73,16 @@ function main(): void {
   const planet = new PlanetRenderer({ n: TILE_N });
   scene.add(planet.group);
 
-  const orbit = new OrbitCamera({ ...DEFAULT_ORBIT, radius: RADIUS });
+  // Altitude in radii, from a fixed altitude in kilometres, so that a small
+  // world starts as a small disc. The retreat bound has to clear it, or a small
+  // world would be clamped straight back to a framing that hides its size.
+  const initialAltitude = INITIAL_ALTITUDE_KM / world.spec.radiusKm;
+  const orbit = new OrbitCamera({
+    ...DEFAULT_ORBIT,
+    radius: RADIUS,
+    initialAltitude,
+    maxAltitude: Math.max(DEFAULT_ORBIT.maxAltitude, initialAltitude * 3),
+  });
   const controls = bindControls(canvas, orbit);
   const overlay = new DiagnosticsOverlay(app);
 
