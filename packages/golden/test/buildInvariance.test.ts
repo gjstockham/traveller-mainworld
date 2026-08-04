@@ -6,12 +6,7 @@ import {
   INVARIANCE_PROFILES,
   VIEWER_BUILD_CONTRACT,
 } from '../build-profiles.mjs';
-import { loadRepoScript } from './loadRepoScript.js';
-
-const { checkRepo, checkViewerBuildContract } =
-  await loadRepoScript<typeof import('../../../scripts/check-build-invariance.mjs')>(
-    'scripts/check-build-invariance.mjs',
-  );
+import { checkRepo, checkViewerBuildContract } from '../../../scripts/check-build-invariance.mjs';
 
 /**
  * A checker that checks nothing passes everything, so this drives the guard

@@ -1,0 +1,17 @@
+# Line endings are normalised to LF in the working tree, on every platform.
+#
+# Not a style preference. Vite's shebang stripper does not handle CRLF: a script
+# starting `#!/usr/bin/env node` that is checked out with Windows line endings
+# leaves a bare `#` after stripping, and any test importing it dies with
+# `SyntaxError: Invalid or unexpected token`. That is what reddened
+# `test (windows-latest)` on the first two CI runs — while all nine browser
+# cells were green — because Windows runners check out with `core.autocrlf`
+# enabled and four scripts in `scripts/` carry a shebang.
+#
+# `packages/golden/test/lineEndings.test.ts` asserts the result rather than
+# trusting this file, since the failure only ever appears on a platform none of
+# us develops on.
+* text=auto eol=lf
+
+# Never touched, whatever the content sniffing decides.
+*.wasm binary

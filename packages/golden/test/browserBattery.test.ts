@@ -4,12 +4,12 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { loadRepoScript } from './loadRepoScript.js';
-
-const { analyseBrowserGraph, checkRepo, extractHtmlEntries, extractSpecifiers } =
-  await loadRepoScript<typeof import('../../../scripts/check-browser-battery.mjs')>(
-    'scripts/check-browser-battery.mjs',
-  );
+import {
+  analyseBrowserGraph,
+  checkRepo,
+  extractHtmlEntries,
+  extractSpecifiers,
+} from '../../../scripts/check-browser-battery.mjs';
 
 /**
  * The guard on the browser battery's import graph.
