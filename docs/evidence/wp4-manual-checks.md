@@ -109,11 +109,32 @@ clears PRD §9.1's two-OS bar. Two things this does **not** clear:
   the note above warns. Their OS comes from the cell name. Do not read those two
   artefacts as macOS coverage — macOS coverage is the `macos-latest` column.
 
-One cell in that run did fail: `test (windows-latest)`, on a `SyntaxError` in two
-unit-test files that import a repo-root `scripts/*.mjs`. It is a Vite module
-resolution problem on Windows, not a determinism finding — `pnpm golden:verify`
-was *skipped* in that job and never ran, so **Node-on-Windows hash equality is
-unobserved rather than disproven**, and the three Windows browser cells passed.
+One cell in that run and its successor did fail: `test (windows-latest)`, on a
+`SyntaxError` in two unit-test files that import a repo-root `scripts/*.mjs`.
+Never a determinism finding — Vite's shebang stripper does not handle CRLF, and
+Windows runners check out with `core.autocrlf` enabled. Fixed in `9ae9444` by
+pinning the working tree to LF (`.gitattributes`), with
+`packages/golden/test/lineEndings.test.ts` as the guard.
+
+It mattered to this file for one reason: `pnpm golden:verify` runs *after*
+`pnpm test` in that job, so while it was red the Windows step was **skipped** and
+Node-on-Windows hash equality was unobserved rather than disproven.
+
+**That gap is now closed.** In [run 30891235962](https://github.com/gjstockham/traveller-mainworld/actions/runs/30891235962)
+(commit `9ae9444`) `test (windows-latest)` passed with `pnpm golden:verify`
+executing and passing. The Node reference leg therefore now covers **all three
+operating systems**, alongside the nine browser cells:
+
+| Leg | ubuntu | macOS | windows |
+|---|---|---|---|
+| Node reference (`test`) | PASS | PASS | PASS |
+| chromium | PASS | PASS | PASS |
+| firefox | PASS | PASS | PASS |
+| webkit (Playwright, *not* Safari) | PASS | PASS | PASS |
+
+Twelve cells, four engines counting Node, three OSes, both artefacts, identical
+digests throughout. What remains unmeasured is what it always was: real Safari,
+real iOS, real Android — M1–M3 below.
 
 ## Manual: real Safari, iOS and Android
 
