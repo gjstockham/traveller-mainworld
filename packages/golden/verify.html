@@ -113,10 +113,11 @@
   </head>
   <body>
     <main>
-      <h1>Determinism battery</h1>
+      <h1>Determinism check</h1>
       <p class="sub">
-        Runs the full battery in this browser and compares every hash against the committed
-        manifest. Takes a minute or two; leave the tab in the foreground.
+        Runs the determinism battery and the golden fixture worlds in this browser, and compares
+        every hash against the committed manifests. Takes a minute or two; leave the tab in the
+        foreground.
       </p>
 
       <div id="status" data-status="starting">Loading…</div>
@@ -137,6 +138,27 @@
           <tbody id="cases"></tbody>
         </table>
       </div>
+
+      <h2>Fixture worlds</h2>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>fixture</th>
+              <th>vs manifest</th>
+              <th>elevation</th>
+              <th>materials</th>
+              <th>water mask</th>
+            </tr>
+          </thead>
+          <tbody id="fixtures"></tbody>
+        </table>
+      </div>
+      <p class="sub">
+        Phase 0 worlds are airless, so the water mask is a constant zero and its hash is identical
+        for every fixture. It is compared, but it is not coverage of a water pass that does not
+        exist yet — see the CHANGELOG entry for 0.1.0.
+      </p>
 
       <pre id="detail" hidden></pre>
 

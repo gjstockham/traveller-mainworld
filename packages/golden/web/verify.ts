@@ -1,36 +1,68 @@
 /**
- * The in-page determinism check (WP4, manual half).
+ * The in-page determinism check (WP4 manual half, WP7 fixtures).
  *
  * Playwright's WebKit is not Safari, so the automated matrix cannot answer the
  * question for real Safari, iOS or Android. Those are hand-checked, and a check
  * that has to be repeated on borrowed devices has to cost nothing: open a URL,
- * read PASS or FAIL, copy the evidence block into ADR-0001.
+ * read PASS or FAIL, copy the evidence block into the WP4 evidence table.
  *
  * The same page is what the Playwright cells drive, so the manual and automated
- * halves of the matrix are running identical code against the identical
- * manifest — a divergence between them would be a property of the browser,
- * which is the entire point, and never of the harness.
+ * halves of the matrix run identical code against identical manifests — a
+ * divergence between them would be a property of the browser, which is the
+ * entire point, and never of the harness.
+ *
+ * Two artefacts are checked here, both of them, always: the determinism battery
+ * against `manifest.json` and the golden fixtures against `fixtures.json`.
+ * There is deliberately no way to run one and report a pass.
  */
 import { GEN_VERSION } from '@traveller-mainworld/core';
 
+import fixtureManifestJson from '../fixtures.json';
 import manifestJson from '../manifest.json';
 import type { BatteryResult } from '../src/battery.js';
+import {
+  type FixtureManifest,
+  type FixtureMismatch,
+  compareFixtureManifest,
+  fixtureManifestPreflight,
+  formatFixtureMismatches,
+} from '../src/fixtureManifest.js';
+import {
+  type FixtureResult,
+  FULL_FIXTURES,
+  QUICK_FIXTURES,
+  fixtureSpecHash,
+  fixturesDigest,
+  resolveFixtureRun,
+} from '../src/fixtures.js';
 import { type Manifest, compareToManifest, formatMismatches } from '../src/manifest.js';
 
-import type { BatterySizeName, StartRequest, WorkerMessage } from './protocol.js';
+import type { RunSizeName, StartRequest, WorkerMessage } from './protocol.js';
 
 const manifest = manifestJson as Manifest;
+const fixtureManifest = fixtureManifestJson as FixtureManifest;
 
-/** What a run reports, in one object: the page prints it, Playwright reads it. */
-export interface BatteryReport {
+/**
+ * Workers the fixture run is spread across.
+ *
+ * Capped rather than taken straight from `hardwareConcurrency`: each worker
+ * holds its own scratch buffers for a whole fixture — about 27 MB at the full
+ * size — and a sixteen-core machine spawning sixteen of those would trade a
+ * runtime win for an out-of-memory on the phones this page exists to check.
+ */
+const MAX_WORKERS = 4;
+
+export interface VerifyReport {
   readonly status: 'pass' | 'fail' | 'error';
   readonly genVersion: string;
   readonly manifestVersion: string;
-  readonly size: BatterySizeName;
+  readonly size: RunSizeName;
+  readonly workers: number;
+
+  /** Determinism battery, against `manifest.json`. */
   readonly digest: string;
   readonly expectedDigest: string;
   readonly cases: readonly BatteryResult[];
-  /** Mismatches, each carrying its position in the battery. Empty on a pass. */
   readonly mismatches: readonly {
     readonly index: number;
     readonly name: string;
@@ -38,6 +70,17 @@ export interface BatteryReport {
     readonly actual: string | undefined;
     readonly reason: string;
   }[];
+
+  /** Golden fixtures, against `fixtures.json`. */
+  readonly fixtureDigest: string;
+  readonly expectedFixtureDigest: string;
+  readonly fixtureSpecHash: string;
+  readonly manifestFixtureSpecHash: string;
+  readonly fixtures: readonly FixtureResult[];
+  readonly fixtureMismatches: readonly FixtureMismatch[];
+  /** Set when the fixture comparison could not meaningfully run at all. */
+  readonly fixtureBlocker: string | undefined;
+
   readonly elapsedMs: number;
   readonly evidence: string;
 }
@@ -45,7 +88,7 @@ export interface BatteryReport {
 declare global {
   interface Window {
     /** Set once the run finishes, in every outcome. The matrix spec reads this. */
-    __batteryReport?: BatteryReport;
+    __goldenReport?: VerifyReport;
   }
 }
 
@@ -60,12 +103,15 @@ function el<T extends HTMLElement>(id: string): T {
 const statusEl = el('status');
 const summaryEl = el('summary');
 const casesEl = el<HTMLTableSectionElement>('cases');
+const fixturesEl = el<HTMLTableSectionElement>('fixtures');
 const detailEl = el('detail');
 const evidenceEl = el('evidence');
 const copyButton = el<HTMLButtonElement>('copy');
 
-const sizeName: BatterySizeName =
+const sizeName: RunSizeName =
   new URLSearchParams(location.search).get('quick') === null ? 'full' : 'quick';
+const runSize = sizeName === 'quick' ? QUICK_FIXTURES : FULL_FIXTURES;
+const plan = resolveFixtureRun(runSize);
 
 function setStatus(status: 'running' | 'pass' | 'fail' | 'error', text: string): void {
   statusEl.dataset['status'] = status;
@@ -80,23 +126,37 @@ function row(label: string, value: string): void {
   summaryEl.append(dt, dd);
 }
 
+function appendRow(tbody: HTMLTableSectionElement, ok: boolean, cells: readonly string[]): void {
+  const tr = document.createElement('tr');
+  tr.dataset['ok'] = String(ok);
+  for (const text of cells) {
+    const td = document.createElement('td');
+    td.textContent = text;
+    tr.append(td);
+  }
+  tbody.append(tr);
+}
+
 /**
  * Everything needed to make a result citable months later.
  *
  * Device and browser versions are the evidence — "it passed on my phone" is not
- * something ADR-0001 can rest on. `navigator.userAgent` is the only identifier
+ * something an ADR can rest on. `navigator.userAgent` is the only identifier
  * available on every target, so the block is deliberately copy-paste shaped
  * rather than parsed.
  */
-function evidenceBlock(report: Omit<BatteryReport, 'evidence'>): string {
+function evidenceBlock(report: Omit<VerifyReport, 'evidence'>): string {
   const nav = navigator as Navigator & { deviceMemory?: number };
   const lines: [string, string][] = [
     ['result', report.status.toUpperCase()],
     ['generator', report.genVersion],
     ['manifest', `${report.manifestVersion} (digest ${report.expectedDigest})`],
     ['battery', `${report.size} — ${String(report.cases.length)} cases`],
-    ['digest', report.digest],
-    ['duration', `${(report.elapsedMs / 1000).toFixed(1)} s`],
+    ['battery digest', report.digest],
+    ['fixture set', `${report.fixtureSpecHash} (manifest ${report.manifestFixtureSpecHash})`],
+    ['fixtures', `${report.size} — ${String(report.fixtures.length)} worlds`],
+    ['fixture digest', `${report.fixtureDigest} (expected ${report.expectedFixtureDigest})`],
+    ['duration', `${(report.elapsedMs / 1000).toFixed(1)} s across ${String(report.workers)} worker(s)`],
     ['user agent', navigator.userAgent],
     [
       'hardware',
@@ -107,88 +167,246 @@ function evidenceBlock(report: Omit<BatteryReport, 'evidence'>): string {
     ['screen', `${String(screen.width)}×${String(screen.height)} @ ${String(devicePixelRatio)}`],
     ['run at', new Date().toISOString()],
   ];
-  if (report.mismatches.length > 0) {
-    const first = report.mismatches[0]!;
+  if (report.fixtureBlocker !== undefined) {
+    lines.push(['fixtures blocked', report.fixtureBlocker]);
+  }
+  const first = report.mismatches[0];
+  if (first !== undefined) {
     lines.push([
-      'first divergence',
+      'first battery divergence',
       `case ${String(first.index)} '${first.name}' (${first.reason}): expected ${
         first.expected ?? '—'
       }, got ${first.actual ?? '—'}`,
+    ]);
+  }
+  const firstFixture = report.fixtureMismatches[0];
+  if (firstFixture !== undefined) {
+    lines.push([
+      'first fixture divergence',
+      `${firstFixture.fixture} / ${firstFixture.buffer} (${firstFixture.reason}): expected ${
+        firstFixture.expected ?? '—'
+      }, got ${firstFixture.actual ?? '—'}`,
     ]);
   }
   const width = Math.max(...lines.map(([label]) => label.length));
   return lines.map(([label, value]) => `${label.padEnd(width)}  ${value}`).join('\n');
 }
 
-function appendCase(index: number, total: number, result: BatteryResult): void {
+// --- worker pool --------------------------------------------------------
+
+const workerCount = Math.max(
+  1,
+  Math.min(MAX_WORKERS, navigator.hardwareConcurrency || 1, plan.fixtures.length),
+);
+
+function spawn(): Worker {
+  return new Worker(new URL('./battery.worker.ts', import.meta.url), { type: 'module' });
+}
+
+/** Send one request to one worker and resolve when it reports a terminal message. */
+function dispatch(
+  worker: Worker,
+  request: StartRequest,
+  onMessage: (message: WorkerMessage) => void,
+): Promise<WorkerMessage> {
+  return new Promise((resolve, reject) => {
+    const handle = (event: MessageEvent<WorkerMessage>): void => {
+      const message = event.data;
+      onMessage(message);
+      if (message.type === 'case' || message.type === 'fixture') return;
+      worker.removeEventListener('message', handle);
+      if (message.type === 'failure') {
+        reject(new Error(message.message));
+      } else {
+        resolve(message);
+      }
+    };
+    worker.addEventListener('message', handle);
+    worker.addEventListener('error', (event) => {
+      reject(new Error(event.message || 'the worker failed to load'));
+    });
+    worker.postMessage(request);
+  });
+}
+
+// --- run ----------------------------------------------------------------
+
+let caseIndex = 0;
+
+function onBatteryCase(result: BatteryResult): void {
   const expected = manifest.cases[result.name];
   const ok = expected !== undefined && expected.hash === result.hash;
-  const tr = document.createElement('tr');
-  tr.dataset['ok'] = String(ok);
   // Verdict before hash: on a phone the row scrolls, and the column that must
   // survive that is the one saying whether this browser agreed.
-  for (const text of [
-    String(index + 1),
+  appendRow(casesEl, ok, [
+    String(caseIndex + 1),
     result.name,
     ok ? 'match' : expected === undefined ? 'not in manifest' : 'DIFFERS',
     `${result.hash.slice(0, 16)}…`,
-  ]) {
-    const td = document.createElement('td');
-    td.textContent = text;
-    tr.append(td);
-  }
-  casesEl.append(tr);
-  setStatus('running', `Running… ${String(index + 1)} of ${String(total)} cases`);
+  ]);
+  caseIndex++;
+  setStatus('running', `Battery… ${String(caseIndex)} cases`);
 }
 
-function finish(results: readonly BatteryResult[], digest: string, elapsedMs: number): void {
+function onFixture(result: FixtureResult, done: number): void {
+  const expected = fixtureManifest.fixtures[result.id];
+  const ok =
+    expected !== undefined &&
+    expected.elevation === result.elevation &&
+    expected.materials === result.materials &&
+    expected.waterMask === result.waterMask;
+  appendRow(fixturesEl, ok, [
+    result.id,
+    ok ? 'match' : expected === undefined ? 'not in manifest' : 'DIFFERS',
+    `${result.elevation.slice(0, 12)}…`,
+    `${result.materials.slice(0, 12)}…`,
+    result.waterMaskAllZero ? 'all zero' : 'NON-ZERO',
+  ]);
+  setStatus('running', `Fixtures… ${String(done)} of ${String(plan.fixtures.length)} worlds`);
+}
+
+async function run(): Promise<void> {
+  const started = performance.now();
+  const workers = Array.from({ length: workerCount }, spawn);
+
+  try {
+    setStatus('running', 'Running the determinism battery…');
+    const batteryDone = await dispatch(workers[0]!, { type: 'battery', size: sizeName }, (m) => {
+      if (m.type === 'case') onBatteryCase(m.result);
+    });
+    if (batteryDone.type !== 'battery-done') {
+      throw new Error(`battery worker reported '${batteryDone.type}'`);
+    }
+
+    setStatus('running', `Running ${String(plan.fixtures.length)} fixture worlds…`);
+    // Round-robin, so a shard is a slice of the set rather than a contiguous
+    // block — a systematic ordering bug shows on every worker rather than one.
+    const shards: string[][] = Array.from({ length: workerCount }, () => []);
+    plan.fixtures.forEach((f, i) => shards[i % workerCount]!.push(f.id));
+
+    let done = 0;
+    const shardResults = await Promise.all(
+      workers.map((worker, i) =>
+        dispatch(worker, { type: 'fixtures', size: sizeName, ids: shards[i]! }, (m) => {
+          if (m.type === 'fixture') onFixture(m.result, ++done);
+        }),
+      ),
+    );
+
+    const collected = new Map<string, FixtureResult>();
+    for (const message of shardResults) {
+      if (message.type !== 'fixtures-done') {
+        throw new Error(`fixture worker reported '${message.type}'`);
+      }
+      for (const result of message.results) collected.set(result.id, result);
+    }
+    // Canonical order, not completion order: the digest is a committed value
+    // and must not depend on which shard finished first.
+    const fixtureResults = plan.fixtures.map((f) => {
+      const result = collected.get(f.id);
+      if (result === undefined) {
+        throw new Error(`fixture '${f.id}' was assigned to a shard but never reported`);
+      }
+      return result;
+    });
+
+    finish(
+      batteryDone.results,
+      batteryDone.digest,
+      fixtureResults,
+      performance.now() - started,
+    );
+  } finally {
+    for (const worker of workers) worker.terminate();
+  }
+}
+
+function finish(
+  results: readonly BatteryResult[],
+  digest: string,
+  fixtures: readonly FixtureResult[],
+  elapsedMs: number,
+): void {
   const mismatches = compareToManifest(manifest, results).map((m) => ({
     ...m,
     index: results.findIndex((r) => r.name === m.name),
   }));
+
+  const specHash = fixtureSpecHash();
+  const fixtureBlocker = fixtureManifestPreflight(
+    fixtureManifest,
+    GEN_VERSION,
+    specHash,
+    runSize.n,
+  );
+  const fixtureMismatches =
+    fixtureBlocker === undefined ? compareFixtureManifest(fixtureManifest, fixtures) : [];
+  const fixtureDigest = fixturesDigest(fixtures);
+
   const versionMismatch = manifest.genVersion !== GEN_VERSION;
-  const status = mismatches.length === 0 && !versionMismatch ? 'pass' : 'fail';
+  const status =
+    mismatches.length === 0 &&
+    fixtureMismatches.length === 0 &&
+    fixtureBlocker === undefined &&
+    !versionMismatch &&
+    fixtureDigest === fixtureManifest.digest
+      ? 'pass'
+      : 'fail';
 
   const partial = {
     status,
     genVersion: GEN_VERSION,
     manifestVersion: manifest.genVersion,
     size: sizeName,
+    workers: workerCount,
     digest,
     expectedDigest: manifest.digest,
     cases: results,
     mismatches,
+    fixtureDigest,
+    expectedFixtureDigest: fixtureManifest.digest,
+    fixtureSpecHash: specHash,
+    manifestFixtureSpecHash: fixtureManifest.fixtureSpecHash,
+    fixtures,
+    fixtureMismatches,
+    fixtureBlocker,
     elapsedMs,
   } as const;
-  const report: BatteryReport = { ...partial, evidence: evidenceBlock(partial) };
+  const report: VerifyReport = { ...partial, evidence: evidenceBlock(partial) };
 
   row('generator', GEN_VERSION);
   row('battery', `${sizeName} — ${String(results.length)} cases`);
-  row('digest', digest);
-  row('expected', manifest.digest);
-  row('duration', `${(elapsedMs / 1000).toFixed(1)} s`);
+  row('battery digest', `${digest}  (expected ${manifest.digest})`);
+  row('fixture set', `${specHash.slice(0, 16)}…  (manifest ${fixtureManifest.fixtureSpecHash.slice(0, 16)}…)`);
+  row('fixture digest', `${fixtureDigest}  (expected ${fixtureManifest.digest})`);
+  row('duration', `${(elapsedMs / 1000).toFixed(1)} s across ${String(workerCount)} worker(s)`);
 
   if (status === 'pass') {
-    setStatus('pass', 'PASS — every battery hash matches the committed manifest');
+    setStatus('pass', 'PASS — every battery and fixture hash matches the committed manifests');
   } else if (versionMismatch) {
     setStatus(
       'fail',
       `FAIL — manifest is for generator ${manifest.genVersion}, this build is ${GEN_VERSION}`,
     );
   } else {
-    const first = mismatches[0]!;
-    setStatus(
-      'fail',
-      `FAIL — ${String(mismatches.length)} mismatch(es), first at case ${String(first.index)} ` +
-        `'${first.name}'`,
-    );
-    detailEl.textContent = formatMismatches(mismatches);
+    const parts: string[] = [];
+    if (mismatches.length > 0) parts.push(`${String(mismatches.length)} battery`);
+    if (fixtureBlocker !== undefined) parts.push('fixtures not comparable');
+    else if (fixtureMismatches.length > 0) parts.push(`${String(fixtureMismatches.length)} fixture`);
+    else if (fixtureDigest !== fixtureManifest.digest) parts.push('fixture digest');
+    setStatus('fail', `FAIL — ${parts.join(', ')} mismatch(es)`);
+    detailEl.textContent = [
+      mismatches.length > 0 ? formatMismatches(mismatches) : '',
+      fixtureBlocker ?? formatFixtureMismatches(fixtureMismatches),
+    ]
+      .filter(Boolean)
+      .join('\n\n');
     detailEl.hidden = false;
   }
 
   evidenceEl.textContent = report.evidence;
   copyButton.hidden = false;
-  window.__batteryReport = report;
+  window.__goldenReport = report;
 }
 
 function fail(message: string): void {
@@ -198,16 +416,24 @@ function fail(message: string): void {
     genVersion: GEN_VERSION,
     manifestVersion: manifest.genVersion,
     size: sizeName,
+    workers: workerCount,
     digest: '',
     expectedDigest: manifest.digest,
     cases: [],
     mismatches: [],
+    fixtureDigest: '',
+    expectedFixtureDigest: fixtureManifest.digest,
+    fixtureSpecHash: fixtureSpecHash(),
+    manifestFixtureSpecHash: fixtureManifest.fixtureSpecHash,
+    fixtures: [],
+    fixtureMismatches: [],
+    fixtureBlocker: undefined,
     elapsedMs: 0,
   } as const;
   const evidence = `${evidenceBlock(partial)}\nerror     ${message}`;
   evidenceEl.textContent = evidence;
   copyButton.hidden = false;
-  window.__batteryReport = { ...partial, evidence };
+  window.__goldenReport = { ...partial, evidence };
 }
 
 copyButton.addEventListener('click', () => {
@@ -218,42 +444,14 @@ if (sizeName === 'quick') {
   const warning = document.createElement('p');
   warning.className = 'warning';
   warning.textContent =
-    'Quick battery: for developing this page only. Its hashes are not comparable ' +
-    'to the manifest, so this run cannot pass — drop ?quick to check a browser.';
+    'Quick run: for developing this page only. Its hashes are not comparable to the ' +
+    'committed manifests, so this run cannot pass — drop ?quick to check a browser.';
   statusEl.after(warning);
 }
 
-let worker: Worker;
-try {
-  worker = new Worker(new URL('./battery.worker.ts', import.meta.url), { type: 'module' });
-} catch (error) {
-  // Not a silent fallback to the main thread: a browser without module workers
-  // is itself a result, and one worth recording next to the passes.
-  fail(
-    `this browser could not start a module worker (${
-      error instanceof Error ? error.message : String(error)
-    }). Record the browser and version; the battery was not run.`,
-  );
-  throw error;
-}
-
-worker.addEventListener('message', (event: MessageEvent<WorkerMessage>) => {
-  const message = event.data;
-  switch (message.type) {
-    case 'case':
-      appendCase(message.index, message.total, message.result);
-      break;
-    case 'done':
-      finish(message.results, message.digest, message.elapsedMs);
-      break;
-    case 'failure':
-      fail(message.message);
-      break;
-  }
+setStatus('running', 'Starting…');
+run().catch((error: unknown) => {
+  // Not a silent fallback to the main thread: a browser that cannot run this is
+  // itself a result, and one worth recording next to the passes.
+  fail(error instanceof Error ? error.message : String(error));
 });
-worker.addEventListener('error', (event) => {
-  fail(event.message || 'the battery worker failed to load');
-});
-
-setStatus('running', 'Running the battery…');
-worker.postMessage({ type: 'start', size: sizeName } satisfies StartRequest);

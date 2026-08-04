@@ -84,7 +84,9 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.config.js', 'scripts/**/*.mjs'],
+    // Repo-level ESM tooling: CI checks, and the golden page's build driver.
+    // Not bundled, not shipped, and Node globals are the point of them.
+    files: ['**/*.config.js', 'scripts/**/*.mjs', 'packages/golden/*.mjs'],
     languageOptions: {
       globals: { process: 'readonly', console: 'readonly', URL: 'readonly' },
     },

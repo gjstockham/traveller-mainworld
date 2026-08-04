@@ -207,6 +207,8 @@ describe('the real verification page', () => {
       'packages/golden/web/verify.ts',
       'packages/golden/web/battery.worker.ts',
       'packages/golden/src/battery.ts',
+      'packages/golden/src/fixtures.ts',
+      'packages/golden/src/fixtureManifest.ts',
       'packages/golden/src/kernelApi.ts',
       'packages/core/src/index.ts',
       'packages/core/src/kernel/approx.ts',
@@ -219,6 +221,9 @@ describe('the real verification page', () => {
   it('does not reach the Node-only modules', () => {
     expect(analysis.visited).not.toContain('packages/golden/src/wasmLoader.ts');
     expect(analysis.visited).not.toContain('packages/golden/src/cli.ts');
+    // `changelog.ts` is pure and would load in a browser, but it is part of the
+    // Node-side change protocol and has no business on this page.
+    expect(analysis.visited).not.toContain('packages/golden/src/changelog.ts');
   });
 
   it('would fail if a real module on the graph acquired a Node import', () => {

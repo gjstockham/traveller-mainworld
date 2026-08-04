@@ -83,6 +83,16 @@ normal/denormal boundary, ulp neighbours of integers and powers of two, and
 magnitudes at both ends of the double range. Every cell compares all 21 case
 hashes plus the overall digest, exactly, against the committed manifest.
 
+> **Amended by WP7 (2026-08-04).** The cells now additionally carry a second
+> artefact, `packages/golden/fixtures.json` — ten fixture worlds through the
+> shipping `TileGenerator`, hashed per output buffer. That is *more* evidence
+> than this ADR was written on, not different evidence, and the digest cited
+> above is unchanged: WP7 settled implementation plan §10 q5 as `genVersion`
+> covering `core` only, with the fixture set keyed on its own hash, precisely so
+> that the number this ADR rests on stays a statement about kernel arithmetic.
+> Nothing below was re-decided; R1 still gates this ADR's status, and now reads
+> on both artefacts.
+
 ### E1 — Cross-platform determinism (WP4)
 
 Source: [`docs/evidence/wp4-manual-checks.md`](../evidence/wp4-manual-checks.md).
@@ -181,10 +191,12 @@ comparison. E1 cannot deliver that at any number of cells.
 ### What the evidence does not cover — and which of it this decision relied on
 
 `docs/evidence/wp4-manual-checks.md` requires this ADR to say explicitly which
-evidence it relied on. (That file attributes the requirement to "open question 5
-in the implementation plan §10"; §10 item 5 in the plan is the generator-version
-scheme, so the reference is off by one against some other numbering. The
-requirement itself is unambiguous and is discharged here.)
+evidence it relied on. (That file used to attribute the requirement to "open
+question 5 in the implementation plan §10", which was a dangling reference: §10
+item 5 is the generator-version scheme. WP7 settled that question and corrected
+the citation, so the discrepancy this note flagged is now closed rather than
+merely recorded. The requirement itself was always unambiguous and is discharged
+here.)
 
 - **The matrix carries the TypeScript kernel only.** The WASM twin is not run
   across the nine cells. This is a deliberate scope choice recorded in
@@ -327,7 +339,7 @@ exit.
 
 | # | Trigger | Consequence |
 |---|---|---|
-| **R1** | The nine `browser-matrix` cells run, and M1–M3 are hand-checked and recorded in `docs/evidence/wp4-manual-checks.md`. | **All green:** §A.3 row 1 is satisfied, this ADR becomes **Accepted**, and the "provisional" framing is removed. **Any divergence:** §A.3 row 3 selects the WASM kernel on correctness grounds regardless of performance. Record the engine, version, OS, case and both hashes; do not loosen a comparison to make a cell green. |
+| **R1** | The nine `browser-matrix` cells run — both golden artefacts, per WP7 — and M1–M3 are hand-checked and recorded in `docs/evidence/wp4-manual-checks.md`. | **All green:** §A.3 row 1 is satisfied, this ADR becomes **Accepted**, and the "provisional" framing is removed. **Any divergence:** §A.3 row 3 selects the WASM kernel on correctness grounds regardless of performance. Record the engine, version, OS, case and both hashes; do not loosen a comparison to make a cell green. |
 | **R2** | The `wasm-parity` workflow fails, or has not run in a quarter. | The mutual-parity evidence has expired. Run `pnpm check:parity`, establish whether the twin is stale or the kernel has changed, and repair the twin — it is the only check that two independent implementations agree. |
 | **R3** | A new generator feature needs an operation the whitelist bans, and no polynomial approximation over whitelisted ops is practical. | The whitelist is no longer sufficient to carry the determinism promise, which is the foundation this decision rests on. Reopen. |
 | **R4** | `pnpm bench` shows the 129² Phase-1 tile exceeding 100 ms, or pool throughput below 25 tiles/s, on the minimum target. | §A.3 row 2 applies: WASM on performance grounds. The 2.4× margin is what makes this unlikely, not impossible — Phase 1 adds passes. |
@@ -338,7 +350,7 @@ exit.
 ## References
 
 - [Phase 0 spike plan](../requirements/phase0-spike-plan.md) §A (criteria in §A.3), §B, risk table
-- [Phase 0 implementation plan](../plans/phase0-implementation-plan.md) §6 (WP6), §10 — *not in version control; see README*
+- [Phase 0 implementation plan](../plans/phase0-implementation-plan.md) §6 (WP6), §10 — *not in version control; the change protocol it defines is restated in [CHANGELOG.md](../../CHANGELOG.md) and the README*
 - [WP4 cross-platform hash evidence](../evidence/wp4-manual-checks.md)
 - [Spike B performance baseline](../../bench/results/phase0.md)
 - [The archived twin](../../crates/kernel-wasm/README.md)

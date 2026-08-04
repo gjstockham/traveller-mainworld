@@ -10,6 +10,12 @@
     "resolveJsonModule": true,
     "noEmit": true
   },
-  "include": ["web/**/*.ts", "e2e/**/*.ts", "vite.config.ts", "playwright.config.ts"],
+  "include": [
+    "web/**/*.ts",
+    "e2e/**/*.ts",
+    "e2e-invariance/**/*.ts",
+    "vite.config.ts",
+    "playwright.config.ts"
+  ],
   "references": [{ "path": "../core" }]
 }

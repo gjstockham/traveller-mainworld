@@ -26,11 +26,35 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm build
 
+  # WP7 §7.3: the fast reference leg, on one runner, gating everything below it.
+  # Both golden artefacts on ubuntu/Node — the determinism battery against
+  # manifest.json and the fixture worlds against fixtures.json. If the hashes
+  # have moved at all, nine browser cells and three OSes are about to say so
+  # nine and three times over; this says it once, in about a minute, before any
+  # of them start.
+  #
+  # It is a gate, not the check: the promise is about *other people's* engines,
+  # so `test` and `browser-matrix` below run the identical comparison on every
+  # OS and engine and are the evidence Phase 0 exits on.
+  golden:
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm golden:verify
+
   # The Node reference leg of the determinism matrix. PRD §9.1 requires at least
   # two OSes; take all three. The browser legs are `browser-matrix` below, and
-  # they compare against this same committed manifest.
+  # they compare against these same committed manifests.
   test:
-    needs: gate
+    needs: golden
     strategy:
       fail-fast: false
       matrix:
@@ -47,13 +71,14 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       # The determinism promise itself (PRD R16). Every OS must produce
-      # byte-identical hashes; WP4 adds the browser legs of this same check.
+      # byte-identical hashes, for the kernel battery and the fixture worlds
+      # alike; `browser-matrix` runs the same comparison in every engine.
       - run: pnpm golden:verify
 
   # WP4: the browser legs of the determinism matrix — the question Spike A was
   # opened to answer. Nine cells: chromium, firefox and webkit on all three
-  # OSes, each running the full battery in-page and comparing every hash against
-  # the committed manifest.
+  # OSes, each running the full battery *and* the fixture worlds in-page and
+  # comparing every hash against the committed manifests.
   #
   # `fail-fast: false` because a divergence is a *finding*: which engines and
   # which OSes diverge is the evidence ADR-0001 needs, and cancelling the other
@@ -64,7 +89,7 @@ jobs:
   # Chrome are hand-checked against the same page; see
   # docs/evidence/wp4-manual-checks.md.
   browser-matrix:
-    needs: gate
+    needs: golden
     strategy:
       fail-fast: false
       matrix:
@@ -91,6 +116,42 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: battery-${{ matrix.os }}-${{ matrix.browser }}
+          path: packages/golden/test-results/
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # WP7 §7.3: the build-invariance cell.
+  #
+  # PRD R11 promises deterministic generation and says nothing about bundlers,
+  # but a minifier may rewrite an expression in ways that change float results
+  # without changing what the source says. The nine cells above all drive one
+  # bundle, so they would agree with each other perfectly while every one of
+  # them ran rewritten arithmetic.
+  #
+  # So this builds the same page unminified, and again under Vite's defaults as
+  # `packages/viewer` builds itself, and holds each to the same committed
+  # manifests. One engine, three pipelines — a bundler is not an engine, and
+  # running this in all three would say nothing three times.
+  # `pnpm lint:invariance` (in `gate`) is what stops the viewer profile quietly
+  # ceasing to mirror the viewer.
+  build-invariance:
+    needs: golden
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm --filter @traveller-mainworld/golden e2e --project=invariance
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-invariance
           path: packages/golden/test-results/
           if-no-files-found: ignore
           retention-days: 30

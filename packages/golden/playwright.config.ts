@@ -24,6 +24,9 @@ const BROWSERS = ['chromium', 'firefox', 'webkit'] as const;
 
 export default defineConfig({
   testDir: './e2e',
+  // Explicit, and shared by both projects: the workflow uploads this one
+  // directory from every cell, and the evidence blocks are what ADR-0001 cites.
+  outputDir: './test-results',
   // The battery is ~15 s on Node, and measured 8–21 s across the three engines
   // on a developer machine. The timeout is nowhere near that because a shared
   // CI runner is not a developer machine, and because the cost of an overlong
@@ -42,10 +45,23 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:4174',
     trace: 'retain-on-failure',
   },
-  projects: BROWSERS.map((browserName) => ({ name: browserName, use: { browserName } })),
+  projects: [
+    ...BROWSERS.map((browserName) => ({ name: browserName, use: { browserName } })),
+    {
+      // WP7 §7.3: the same page under two further bundler configurations, held
+      // to the same committed manifests. Its own project and its own directory
+      // so `--project=chromium` stays exactly nine engine cells and this stays
+      // one bundler cell — a bundler is not an engine, and running it three
+      // times would say nothing three times.
+      name: 'invariance',
+      testDir: './e2e-invariance',
+      use: { browserName: 'chromium' as const },
+    },
+  ],
   webServer: {
-    // Builds the page first: the matrix must run the same static artefact the
-    // manual spot-checks are served, not a dev-server transform of it.
+    // Builds the page first, under every profile: the matrix must run the same
+    // static artefact the manual spot-checks are served, not a dev-server
+    // transform of it.
     command: 'pnpm build:web && pnpm preview:web',
     url: 'http://127.0.0.1:4174/verify.html',
     reuseExistingServer: !process.env['CI'],

@@ -11,7 +11,7 @@ A browser-based tool that turns a Universal Planetary Profile (UPP) plus a seed 
 | `packages/core` | Headless deterministic generation. Zero rendering dependencies. |
 | `packages/core/src/kernel` | **The whitelisted zone** — see below. |
 | `packages/viewer` | Three.js cube-sphere viewer (Vite). |
-| `packages/golden` | Golden-hash fixtures, manifest and runners. |
+| `packages/golden` | Golden-hash battery, fixture worlds, manifests and runners. |
 | `crates/kernel-wasm` | Rust→wasm32 twin of the kernel. Must hash identically to it. |
 | `bench` | Spike B performance baseline, and the results it produced. |
 | `scripts` | Repo checks run in CI. |
@@ -22,9 +22,10 @@ Requires Node ≥ 22 and pnpm (via `corepack enable pnpm`).
 
 ```sh
 pnpm install
-pnpm check           # lint + typecheck + build + test
-pnpm golden:verify   # determinism battery vs the committed manifest
-pnpm golden:matrix   # the same battery in chromium, firefox and webkit
+pnpm check             # lint + typecheck + build + test
+pnpm golden:verify     # both golden artefacts vs their committed manifests
+pnpm golden:matrix     # the same, in chromium, firefox and webkit
+pnpm golden:invariance # the same, under two further bundler configurations
 pnpm --filter @traveller-mainworld/viewer dev    # the viewer
 pnpm --filter @traveller-mainworld/viewer e2e    # headless smoke tests
 ```
@@ -88,39 +89,98 @@ unconditionally, because cross-face adjacency needs a rotation table the viewer
 does not yet carry. Twelve cube edges are affected, and a faint seam is visible
 along them at some angles.
 
-## The determinism battery
+## The two golden artefacts
 
-`packages/golden` evaluates every kernel function over ≥10⁶ deliberately hostile
-inputs — signed zeros, denormals, the normal/denormal boundary, ulp neighbours
-of integers and powers of two, and magnitudes at both ends of the double range —
-then hashes the canonical little-endian bytes of the results. Those hashes are
-committed in `packages/golden/manifest.json`.
+`packages/golden` commits two records of what the generator produces, and every
+cell of the matrix checks both.
 
-Running that battery on every browser and OS, and against the WASM kernel, is
-what turns "should be identical" into "demonstrably is". CI fails on any
-mismatch.
+**The determinism battery** (`manifest.json`) evaluates every kernel function
+over ≥10⁶ deliberately hostile inputs — signed zeros, denormals, the
+normal/denormal boundary, ulp neighbours of integers and powers of two, and
+magnitudes at both ends of the double range — then hashes the canonical
+little-endian bytes of the results.
+
+**The golden fixtures** (`fixtures.json`) generate ten whole worlds through the
+same `TileGenerator` the viewer ships. Ten hand-written specs spanning Cepheus
+sizes 1–A, each evaluated over a fixed 90-tile set covering all six faces at
+depths 0–6 — deliberately including every face corner and edge-adjacent tiles in
+both orientations, because that is where a tangent-warp mapping bug shows first
+and a face interior is where it shows last. Each output buffer is hashed
+separately: elevation, water mask, materials. A kernel function can be perfectly
+bit-stable while the composition of them into a tile is not, and this is what
+catches that.
+
+Running both on every browser and OS is what turns "should be identical" into
+"demonstrably is". CI fails on any mismatch. (`pnpm golden:parity`, the TS↔WASM
+comparison, still runs the battery only — its `tile.composite` case covers tile
+generation through both kernels, and the archived twin is not maintained against
+the fixture set.)
+
+**The water-mask hashes are hashes of a constant.** Phase 0 worlds are airless,
+so the water mask is all zeros for every fixture and its hash is identical
+across all ten. It is compared — an unintended non-zero would fail — but it is
+not coverage of a water pass that does not exist yet, and it will keep passing
+when Phase 2's lands broken. `fixtures.json` records `waterMaskAllZero` per
+fixture so that is data rather than a comment, and a test asserts the flag
+against the real buffer so it cannot quietly become false.
+
+### Why two files rather than more rows in one
+
+`genVersion` is not a manifest key. It is embedded in share URLs and exports,
+and PRD R15 obliges the app to keep a code path alive for every version it ever
+emits — so it moves when the *arithmetic* moves. A fixture spec is a test input:
+editing one alters output for no input a user can reach, and bumping the
+generator version for it would mint a phantom version with no code behind it.
+
+So `genVersion` covers `packages/core` only, and the fixture set carries its own
+identity — a **fixture-spec hash** over the specs, seeds, tile set and grid size.
+Edit a radius and that hash moves, visibly, without touching the kernel's version
+and without invalidating evidence about arithmetic that did not change. Given the
+fixture set needs its own key regardless, folding its hashes into `manifest.json`
+would buy one file and cost the thing that matters: the battery digest would then
+move whenever a fixture changed, so every citation of it as *kernel* evidence
+would go stale for reasons unrelated to the kernel.
+
+Two files can drift. Three things stop that being a standing question: both carry
+`genVersion` and the fixture comparison refuses to run when they disagree;
+`golden:verify` runs both, so there is no command that checks one and reports
+success; and every matrix cell asserts both ran.
 
 ## The cross-platform matrix
 
-The determinism promise is a claim about *other people's* engines, so the
-battery runs on all of them: chromium, firefox and webkit × ubuntu, macOS and
+The determinism promise is a claim about *other people's* engines, so both
+artefacts run on all of them: chromium, firefox and webkit × ubuntu, macOS and
 Windows, alongside the Node reference run on the same three OSes. Nine browser
-cells, each comparing every hash against the same committed manifest.
+cells, each comparing every hash against the same committed manifests. A quick
+ubuntu/Node job runs the identical comparison first and gates the rest, so a
+hash that has already moved says so once in about a minute rather than twelve
+times in twenty.
 
 ```sh
 pnpm golden:matrix   # all three engines locally (needs: pnpm exec playwright install)
 pnpm golden:page     # serve verify.html on :4174 for a hand-check on a real device
 ```
 
+The page runs the battery in one worker and shards the fixture worlds across a
+small pool, because a hand-check on a borrowed phone has to finish while the tab
+is still in the foreground. Sharding is a property of the runner: each fixture is
+an independent pure function of its own spec and seed, so which worker evaluates
+one cannot reach its hash, and a test proves a sharded run equals a whole one. If
+a cell is slow, that is a runner to fix — never a fixture set to trim, because
+the moment the count answers to a stopwatch the number in the manifest stops
+meaning anything.
+
 A mismatch there is not a flake to retry — it is Spike A answering its question,
 and per the spike plan it selects the WASM kernel on correctness grounds
 regardless of performance. So the cells never retry, `fail-fast` is off so every
-engine reports, and the failure names the first divergent case and its index.
+engine reports, and the failure names the first divergent case or fixture, which
+buffer it was, and both hashes.
 
 Playwright's WebKit is **not** Safari, so the matrix cannot close this on its
 own. Real Safari, iOS Safari and Android Chrome are hand-checked against
-`packages/golden/verify.html` — a static page that runs the same battery in a
-worker and prints PASS/FAIL, the digest, and a copy-paste evidence block.
+`packages/golden/verify.html` — a static page that runs the same battery and the
+same fixture worlds and prints PASS/FAIL, both digests, the fixture-set hash, and
+a copy-paste evidence block.
 Results and method live in
 [docs/evidence/wp4-manual-checks.md](docs/evidence/wp4-manual-checks.md).
 
@@ -130,10 +190,42 @@ graph may reach `@traveller-mainworld/golden/node` — the one module that touch
 entry through the worker and into `core`, and fails `pnpm lint` on any Node
 import, rather than leaving it to a bundler error or, worse, a silent shim.
 
-An intentional output change requires, **in the same PR**: a generator version
-bump, a regenerated manifest (`pnpm golden:update`, which refuses to run without
-the bump), and a changelog entry. The manifest diff makes silent drift
-impossible.
+## Build invariance
+
+PRD R11 promises deterministic generation and says nothing about bundlers, but a
+minifier is free to rewrite an expression in ways that change float results
+without changing what the source says. All nine matrix cells drive one bundle, so
+they would agree with each other perfectly while every one of them ran rewritten
+arithmetic.
+
+So `pnpm golden:invariance` builds the same page two further ways — unminified,
+and under Vite's defaults exactly as `packages/viewer` builds itself — and holds
+each to the same committed manifests. One engine, three pipelines; a bundler is
+not an engine, so running it in all three would say nothing three times.
+`packages/golden/build-profiles.mjs` holds the configurations, and
+`scripts/check-build-invariance.mjs` fails `pnpm lint` if the viewer stops
+building under Vite's defaults — otherwise the profile would quietly cease to
+mirror the bundle that actually ships, with the cell still green.
+
+## The change protocol
+
+An intentional output change requires all three of these **in the same commit**,
+and all three are enforced:
+
+1. **The identity that moved is bumped** — `GEN_VERSION` for a kernel change, the
+   fixture-spec hash for a fixture change. `golden:update` and
+   `golden:update:fixtures` refuse when neither moved.
+2. **The affected manifest is regenerated** — `pnpm golden:update`,
+   `pnpm golden:update:fixtures`. The verify legs fail otherwise.
+3. **A `CHANGELOG.md` entry naming what moved and why.** Also refused without:
+   the update commands check for a section for the new version, or for the new
+   fixture-spec hash, before they will write. The gate lives there rather than in
+   a CI diff check because this repository is developed by committing to `main`,
+   where a pull-request diff would never fire.
+
+The manifest diff shows *that* hashes moved; only the changelog says whether that
+was intended. [`CHANGELOG.md`](CHANGELOG.md) carries the protocol in full, since
+the implementation plan it comes from is not in version control.
 
 ## The kernel whitelist
 
