@@ -30,6 +30,70 @@ above is the copy that is, and the README repeats it.
 
 ---
 
+## 0.2.0-alpha.2 — craters that are visible from orbit (WP10)
+
+The first flight of `0.2.0-alpha.1` found the band gate wrong in the way that
+mattered most: **craters popped in, and craters that should have been visible
+from higher up were not there.** Both come from the same mistake.
+
+- **The gate asked the wrong question.** It asked whether a *tile's own vertex
+  grid* can resolve a crater. That is right for aliasing and wrong for
+  visibility: a full-disc view resolves far finer than a depth-0 tile's
+  1.4°-per-sample grid, because the screen has more pixels across the planet than
+  the tile has vertices. An orbital view sits at depth 1, where the gate admitted
+  no bands at all — so it showed 24 basins and nothing else, and the largest
+  tier-2 craters (35–70 km across on a Luna-sized world, the ones that give it
+  its face) waited for a descent to depth 3 and then arrived together.
+
+  **`ALWAYS_ON_BANDS = 2`**: the two largest bands are evaluated at every depth,
+  like the basins above them. On a Luna-sized world that is craters 17–70 km
+  across, which is about what a full-disc view can distinguish. Three bands would
+  be tens of thousands of lattice cells and megabytes of cache at depth 0, which
+  is why it is two.
+
+- **`BAND_SAMPLES_ACROSS`: 6 → 3.** This started at 6 on the reasoning that three
+  samples across renders a crater as a faceted pit. The reasoning ignored that
+  the same constant sets how *late* a band arrives and how *large* its craters
+  are when they do — so 6 both delayed every band by a level and doubled the pop
+  when it came. It also halves the LOD crack, and therefore the skirt. The
+  faceting it costs is on the newly-gated band alone, which the next level of
+  refinement fixes.
+
+  The ladder is now: two bands from orbit, then one new band per level from depth
+  4, each half the size of the last.
+
+- **A hypothesis that the measurement killed, recorded so it is not re-run.** The
+  obvious suspect was the LOD selector, whose screen-space error is pure sphere
+  curvature and ignores terrain entirely — plausibly it stops refining as the
+  camera descends, exactly when detail matters. A `lodStepBound`-derived detail
+  term was written and then measured: at the altitudes that matter it changes
+  nothing (identical tile counts and depths from 8.6 down to 0.02 radii), and it
+  only bites below 0.005 radii, where it costs 58% more tiles to gain one depth
+  level. Reverted. The curvature metric is adequate; the gate was the problem.
+
+- **Craters are not bounded by `terrainAmplitudeM`, and nothing had noticed.**
+  That field bounded the whole surface through Phase 0 and now bounds only the
+  fBm half of it — a crater's depth comes from its diameter and the world's
+  gravity, so a large basin on a geologically flat world is deep because the
+  impact was large. Two tests asserted the old bound and passed anyway, because
+  the tiles they looked at happened to miss the basins; putting bands at every
+  depth is what surfaced it. Both are rewritten to assert the two halves
+  separately, and `PhysicalWorldSpec` says so at the field.
+
+- **Cost**, same conditions as `alpha.1`'s table. 65² — the shipped path — runs
+  18–30 ms across the whole depth range. 129² runs 66–110 ms: the always-on bands
+  add about 20 ms at the shallow depths that previously paid nothing, and the
+  deep end is unchanged because those bands were already gated in. It still
+  crosses the budget past depth 10 at 129², and that remains WP15's to close
+  along with open question 1.
+
+- **`GEN_VERSION` moved and the fixture set did not**, which is the two-identity
+  design doing its job: the fixture *inputs* — specs, seeds, tile set, grid size
+  — are untouched, and only the arithmetic reading them changed. The fixture set
+  stays `4f23f0304c09635f…`; both manifests are regenerated because the hashes
+  they hold are of output, not of inputs. Battery digest `fd524e07732c8ad5…`
+  (was `513f7af6…`), fixture digest `2fa27beada75a160…`.
+
 ## 0.2.0-alpha.1 — crater fields (WP10)
 
 **A prerelease, on purpose.** WP10 changes generated output many times over a

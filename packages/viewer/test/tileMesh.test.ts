@@ -166,14 +166,20 @@ describe('winding', () => {
 
 describe('positions', () => {
   it('places grid vertices at radius + scaled elevation', () => {
+    // Checked against the tile's own elevations rather than against
+    // `terrainAmplitudeM`. That constant used to bound the surface and, since
+    // WP10, bounds only the fBm half of it — a crater's depth comes from its
+    // diameter and the world's gravity, so it can and does go further. Reading
+    // the bound off the data makes this a test of `buildTilePositions`'
+    // arithmetic, which is what it was always meant to be.
     const n = 8;
-    const { positions } = build(0, n);
+    const depth = 0;
+    const tile = gen.generate(makeTileId(0, depth, 0), WORLD, n);
+    const { positions } = build(0, n, depth);
     const gridVerts = (n + 1) * (n + 1);
     for (let v = 0; v < gridVerts; v++) {
       const r = Math.hypot(positions[v * 3]!, positions[v * 3 + 1]!, positions[v * 3 + 2]!);
-      const maxOffset = WORLD.spec.terrainAmplitudeM * ELEV_SCALE;
-      expect(r).toBeGreaterThan(RADIUS - maxOffset * 1.01);
-      expect(r).toBeLessThan(RADIUS + maxOffset * 1.01);
+      expect(r, `vertex ${v}`).toBeCloseTo(RADIUS + tile.elevation[v]! * ELEV_SCALE, 6);
     }
   });
 
@@ -212,23 +218,29 @@ describe('positions', () => {
 describe('skirtDepthFor', () => {
   const TRUE_SCALE = 1 / (1737 * 1000);
 
+  /** First depth at which the band gate admits something the always-on floor did not. */
+  const FIRST_GATED_DEPTH = (() => {
+    for (let d = 1; d <= 20; d++) if (lodStepBound(d) > 0) return d;
+    throw new Error('no depth gates a band in; the ladder is broken');
+  })();
+
   it('shrinks with depth once the crater bands are on', () => {
-    // Not from depth 0: the first band is gated in at depth 3, so a depth-3 tile
-    // is the first that can disagree with its parent about craters and the wall
-    // steps up to cover it. Below that there is no crater crack to hide and the
-    // skirt is the Phase 0 geometric-plus-fBm estimate. From 3 upward every
-    // level halves the band's crater size, so it shrinks monotonically again.
+    // Not from depth 0. The always-on bands are present at every depth, so no
+    // crack opens between the shallowest levels at all; the first *gated* band
+    // arrives at depth 4, which is the first tile that can disagree with its
+    // parent about craters, and the wall steps up to cover it. From there every
+    // level halves the band's crater size and it shrinks monotonically again.
     let prev = Infinity;
-    for (let d = 3; d <= 12; d++) {
+    for (let d = FIRST_GATED_DEPTH; d <= 12; d++) {
       const s = skirtDepthFor(d, 1, 6000, ELEV_SCALE, 64, 1737);
       expect(s, `depth ${d}`).toBeLessThan(prev);
       expect(s).toBeGreaterThan(0);
       prev = s;
     }
     expect(
-      skirtDepthFor(3, 1, 6000, ELEV_SCALE, 64, 1737),
-      'the first crater band did not lengthen the skirt',
-    ).toBeGreaterThan(skirtDepthFor(2, 1, 6000, ELEV_SCALE, 64, 1737));
+      skirtDepthFor(FIRST_GATED_DEPTH, 1, 6000, ELEV_SCALE, 64, 1737),
+      'the first gated crater band did not lengthen the skirt',
+    ).toBeGreaterThan(skirtDepthFor(FIRST_GATED_DEPTH - 1, 1, 6000, ELEV_SCALE, 64, 1737));
   });
 
   it('STAYS PROPORTIONATE TO THE TILE at every depth', () => {
@@ -270,7 +282,7 @@ describe('skirtDepthFor', () => {
     // The load-bearing claim, and the reason the crater term exists at all. If
     // `lodStepBound` moves and the skirt does not, cracks open at every LOD ring
     // and read as a seam — which is exactly what C2 is looking for.
-    for (let d = 3; d <= 12; d++) {
+    for (let d = FIRST_GATED_DEPTH; d <= 12; d++) {
       const crackScene = lodStepBound(d) * 1737 * 1000 * TRUE_SCALE;
       expect(skirtDepthFor(d, 1, 6000, TRUE_SCALE, 64, 1737), `depth ${d}`).toBeGreaterThan(
         crackScene,

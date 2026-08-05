@@ -1,6 +1,6 @@
 {
-  "genVersion": "0.2.0-alpha.1",
-  "digest": "513f7af66fbd228c498c87944b83e56e3aaf6be55032b387cba47ad9a59aa498",
+  "genVersion": "0.2.0-alpha.2",
+  "digest": "fd524e07732c8ad5b266564d97deb33dcfc34c45ac707dc7f45b88ae6d641d80",
   "cases": {
     "ops.powi3": {
       "hash": "8b15f5e1d718cfd41a4b4d5c53b6b6a56888cc87bdec2611b932895b5256582c",
@@ -83,7 +83,7 @@
       "samples": 1002528
     },
     "tile.composite": {
-      "hash": "d96b04fe439119622beb940ae5d5cf0cd69886548959f44050abae29fa8bf85d",
+      "hash": "6a430030cd4020ac9e1fca207d99408c3fce5e66b288ee9b89f80bcbbb041041",
       "samples": 1397844
     }
   }

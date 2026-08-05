@@ -136,27 +136,55 @@ export const CANDIDATES_PER_CELL = 3;
 /**
  * Samples that must span the smallest crater in a band for it to be gated in.
  *
- * Six, because three is the number at which a crater is a triangle. The
- * newly-gated band is the one whose craters are smallest, and at three samples
- * across they render as faceted pits rather than bowls — at 65² especially,
- * where the mesh has no more resolution to give them.
+ * **It also sizes the crack at an LOD boundary, and it makes that crack bigger
+ * rather than smaller.** A tile at depth `d+1` carries one band its parent does
+ * not, so at a shared position the two differ by that band's crater relief. Band
+ * `B` is gated in at `d+1` and not at `d`, so its smallest radius lies in
+ * `[k/2, k)` sample spacings, its largest is under `2k`, and a fresh simple
+ * crater's floor sits `0.4 · r` below the datum. The step is bounded by
+ * **`0.8 · k` sample spacings** — not the fraction of one that layered noise
+ * gives.
  *
- * **It is also what sizes the crack at an LOD boundary, and it makes that crack
- * bigger rather than smaller.** A tile at depth `d+1` carries one band its
- * parent does not, so at a shared position the two differ by that band's crater
- * relief. Band `B` is gated in at `d+1` and not at `d`, so its smallest radius
- * lies in `[k/2, k)` sample spacings, its largest is under `2k`, and a fresh
- * simple crater's floor sits `0.4 · r` below the datum. The step is therefore
- * bounded by **`0.8 · k` sample spacings** — about five at `k = 6`, not the
- * fraction of one that layered noise gives.
+ * So `k` trades two things off, and **both of them favour a small value**: a
+ * larger `k` means a band arrives a level later, and arrives as craters that are
+ * proportionally larger and therefore pop harder. This started at 6, on the
+ * reasoning that three samples across renders a crater as a faceted pit. Flying
+ * it said otherwise — the first thing anyone noticed was craters appearing
+ * abruptly that should have been visible from higher up — and the trade is
+ * simply not close: 3 halves the LOD crack, brings every band in a level
+ * earlier, and the faceting it costs is on the *newly-gated* band only, which
+ * the next level of refinement fixes.
  *
- * That is not a defect; it is what a crater field is. But it is not what the
- * viewer's skirt depth was sized for: `skirtDepthFor` derives the crack from the
- * fBm's statistical self-similarity, which craters do not obey, and it was
- * roughly a hundred times too short until WP10 gave it a crater term.
- * `craters.test.ts` asserts the bound, so the two cannot drift apart silently.
+ * The other half of that finding is {@link ALWAYS_ON_BANDS}.
+ *
+ * `craters.test.ts` asserts the bound, so this and the viewer's skirt cannot
+ * drift apart silently.
  */
-export const BAND_SAMPLES_ACROSS = 6;
+export const BAND_SAMPLES_ACROSS = 3;
+
+/**
+ * Bands evaluated at every depth, however coarse the tile.
+ *
+ * The band gate asks whether a tile's own vertex grid can resolve a crater. That
+ * is the right question for aliasing and the wrong one for visibility: a
+ * full-disc view resolves far finer than a depth-0 tile's 1.4°-per-sample grid,
+ * because the screen has more pixels across the planet than the tile has
+ * vertices. Gating on the tile alone left an orbital view showing 24 basins and
+ * nothing else, and put the largest tier-2 craters — 35 to 70 km across on a
+ * Luna-sized world, the ones that give it its face — behind a descent to depth
+ * 3, where they arrived all at once.
+ *
+ * Two bands are unconditional instead, spanning crater radii from
+ * `LARGEST_BAND_RADIUS / 4` up. On a Luna-sized world that is 17 to 70 km in
+ * diameter, which is about what a full-disc view can actually distinguish;
+ * band 2 would be a pixel or two and is left to the gate.
+ *
+ * It costs a fixed `2 · 27 · CANDIDATES_PER_CELL` cell lookups per sample at the
+ * depths that did not previously pay them, and a lattice cache over a whole cube
+ * face at depth 0 — a few thousand cells, because the cell size scales with the
+ * band. Three would be tens of thousands and megabytes, which is why it is two.
+ */
+export const ALWAYS_ON_BANDS = 2;
 
 /**
  * Reference sample spacing at a quadtree depth, in radians of arc.
@@ -242,6 +270,10 @@ export function bandCellSize(band: number): number {
  * established seam-free-by-construction pattern: a band a shallow tile skips is
  * one a deeper tile adds, and both agree on everything they both evaluate.
  *
+ * The first {@link ALWAYS_ON_BANDS} are never gated — see that constant for why
+ * the tile's own resolution is the wrong question to ask about the largest
+ * craters.
+ *
  * **Both the tile path and the export path must call this one function.** A gate
  * that differs by one band between them is precisely the PRD §9.4 failure — an
  * exported map that is subtly not the planet.
@@ -255,7 +287,9 @@ export function bandsForDepth(depth: number): number {
   while (count < MAX_BANDS && bandMinRadius(count) >= resolvable) {
     count++;
   }
-  return count;
+  // `max` of a monotonic function and a constant is still monotonic, so the
+  // floor cannot break the gate's ordering guarantee.
+  return Math.max(count, ALWAYS_ON_BANDS);
 }
 
 // --- world seeds -------------------------------------------------------------

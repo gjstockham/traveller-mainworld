@@ -13,6 +13,7 @@
  */
 import {
   APRON_RING,
+  ALWAYS_ON_BANDS,
   BAND_SAMPLES_ACROSS,
   lodStepBound,
   CANDIDATES_PER_CELL,
@@ -231,20 +232,34 @@ describe('band gating', () => {
     expect(bandsForDepth.length).toBe(1);
   });
 
-  it('reaches the cap and stops', () => {
-    expect(bandsForDepth(0)).toBe(0);
+  it('never drops below the always-on floor, and reaches the cap', () => {
+    expect(bandsForDepth(0)).toBe(ALWAYS_ON_BANDS);
     expect(bandsForDepth(40)).toBe(MAX_BANDS);
   });
 
   it('gates a band in only once its craters span the stated sample count', () => {
     for (let depth = 1; depth <= 12; depth++) {
       const count = bandsForDepth(depth);
-      if (count === 0) continue;
+      // The always-on bands are exempt by construction — they are the ones the
+      // tile's own resolution is the wrong question about. See ALWAYS_ON_BANDS.
+      if (count <= ALWAYS_ON_BANDS) continue;
       // Calibrated at 64, deliberately — see BAND_GATE_N.
       const spacing = QUARTER_TURN / (Math.pow(2, depth) * 64);
       const smallest = bandMinRadius(count - 1);
       expect(2 * smallest).toBeGreaterThanOrEqual(BAND_SAMPLES_ACROSS * spacing * 0.999999);
     }
+  });
+
+  it('shows the largest craters from orbit, which is why ALWAYS_ON_BANDS exists', () => {
+    // The finding that produced the constant: a full-disc view sits at depth 1,
+    // where the resolution gate alone admitted no bands at all — so an orbital
+    // view showed 24 basins and nothing else, and the biggest tier-2 craters
+    // arrived in one step partway down. A test, because the next person tuning
+    // the gate will not know that from the numbers.
+    expect(bandsForDepth(1)).toBeGreaterThanOrEqual(2);
+    // And they are genuinely the large ones: on a Luna-sized world, tens of km.
+    expect(2 * bandMaxRadius(0) * 1737).toBeGreaterThan(50);
+    expect(2 * bandMinRadius(1) * 1737).toBeGreaterThan(10);
   });
 });
 

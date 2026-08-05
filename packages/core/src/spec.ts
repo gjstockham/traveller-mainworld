@@ -155,7 +155,15 @@ export interface PhysicalWorldSpec {
   readonly hints: DerivedHints;
   /** Crater-field parameters (Phase 1 plan §4.1). */
   readonly craters: CraterSpec;
-  /** Peak-to-trough terrain relief in metres. */
+  /**
+   * Peak-to-trough relief of the **base terrain field**, in metres.
+   *
+   * Not a bound on elevation. It was one through Phase 0, when the fBm field was
+   * the whole surface; from WP10 craters are added on top and their depth comes
+   * from the crater's diameter and the world's gravity, not from how rough the
+   * world is. A large basin on a geologically flat world is deep because the
+   * impact was large. `generator.test.ts` asserts both halves.
+   */
   readonly terrainAmplitudeM: number;
   /** Base terrain field parameters. */
   readonly fbm: FbmParams;

@@ -20,6 +20,18 @@ const WORLD: World = {
   seedLo: 0x12345678,
 };
 
+/**
+ * The same world with no craters at all.
+ *
+ * Several properties here are about the *base terrain* and were written when
+ * that was the only thing generated. They are still true and still worth
+ * asserting; they are just no longer true of the whole surface.
+ */
+const CRATERLESS: World = {
+  ...WORLD,
+  spec: { ...WORLD.spec, craters: { ...WORLD.spec.craters, densityScale: 0 } },
+};
+
 const gen = new TsTileGenerator(GEN_VERSION);
 
 describe('TsTileGenerator', () => {
@@ -49,27 +61,59 @@ describe('TsTileGenerator', () => {
     }
   });
 
-  it('respects the terrain amplitude', () => {
-    const tile = gen.generate(makeTileId(0, 0, 0), WORLD, 64);
+  it('bounds the BASE TERRAIN by the terrain amplitude', () => {
+    // Normalisation makes amplitudeM a hard bound on the fBm relief — and on
+    // that alone. See the crater test below for the half of the surface it does
+    // not bound.
+    const tile = gen.generate(makeTileId(0, 0, 0), CRATERLESS, 64);
     let max = 0;
     for (const e of tile.elevation) {
       max = Math.max(max, Math.abs(e));
     }
-    // Normalisation makes amplitudeM a hard bound on relief.
-    expect(max).toBeLessThanOrEqual(WORLD.spec.terrainAmplitudeM);
+    expect(max).toBeLessThanOrEqual(CRATERLESS.spec.terrainAmplitudeM);
     expect(max).toBeGreaterThan(0);
   });
 
-  it('scales with amplitude linearly', () => {
-    const doubled: World = {
-      ...WORLD,
-      spec: { ...WORLD.spec, terrainAmplitudeM: WORLD.spec.terrainAmplitudeM * 2 },
-    };
-    const a = gen.generate(makeTileId(1, 2, 5), WORLD, 16);
-    const b = gen.generate(makeTileId(1, 2, 5), doubled, 16);
+  it('lets craters go beyond it, because a crater is not made of terrain relief', () => {
+    // `terrainAmplitudeM` is the fBm field's peak-to-trough figure, and WP10
+    // made it stop being a bound on total elevation. A crater's depth comes from
+    // its diameter and the world's gravity, so a basin on a geologically flat
+    // world is deep *because the impact was large*, not because the world is
+    // rough. Nothing caught this when craters landed — every test that could
+    // have was looking at a tile the basins happened to miss.
+    const tile = gen.generate(makeTileId(0, 3, 21), WORLD, 64);
+    let max = 0;
+    for (const e of tile.elevation) max = Math.max(max, Math.abs(e));
+    expect(max).toBeGreaterThan(0);
+    // Not unbounded, though: a sanity envelope, so a runaway profile is still
+    // caught. The deepest thing on the sphere is the largest basin.
+    expect(max).toBeLessThan(WORLD.spec.terrainAmplitudeM + 0.4 * 0.3 * WORLD.spec.radiusKm * 1000);
+  });
+
+  it('scales the base terrain with amplitude linearly, and craters not at all', () => {
+    const withCraters = (spec: World['spec']): World => ({ ...WORLD, spec });
+    const doubled = (w: World): World => ({
+      ...w,
+      spec: { ...w.spec, terrainAmplitudeM: w.spec.terrainAmplitudeM * 2 },
+    });
+
+    // Base terrain: exactly linear, as it always was.
+    const a = gen.generate(makeTileId(1, 2, 5), CRATERLESS, 16);
+    const b = gen.generate(makeTileId(1, 2, 5), doubled(CRATERLESS), 16);
     for (let i = 0; i < a.elevation.length; i++) {
       expect(b.elevation[i]).toBeCloseTo(a.elevation[i]! * 2, 9);
     }
+
+    // With craters it is not, and the departure is the crater relief itself —
+    // which is the assertion that stops the check above being satisfied by a
+    // generator that ignored amplitude entirely.
+    const c = gen.generate(makeTileId(1, 2, 5), withCraters(WORLD.spec), 16);
+    const d = gen.generate(makeTileId(1, 2, 5), doubled(WORLD), 16);
+    let departures = 0;
+    for (let i = 0; i < c.elevation.length; i++) {
+      if (Math.abs(d.elevation[i]! - c.elevation[i]! * 2) > 1e-6) departures++;
+    }
+    expect(departures).toBeGreaterThan(0);
   });
 
   it('gives different worlds for different seeds', () => {
