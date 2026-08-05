@@ -343,9 +343,11 @@ describe('running fixtures', () => {
     const expected = MANIFEST.fixtures[fixture.id]!;
     expect(result.elevation).toBe(expected.elevation);
     expect(result.materials).toBe(expected.materials);
+    expect(result.albedo).toBe(expected.albedo);
     expect(result.waterMask).toBe(expected.waterMask);
     expect(result.tiles).toBe(expected.tiles);
     expect(result.vertices).toBe(expected.vertices);
+    expect(result.albedoDistinct).toBe(expected.albedoDistinctValues);
   }, 30_000);
 
   it('is not affected by how the run is sharded', () => {
@@ -382,6 +384,33 @@ describe('running fixtures', () => {
     for (const entry of Object.values(MANIFEST.fixtures)) {
       expect(entry.waterMaskAllZero).toBe(true);
     }
+  });
+
+  it('REPORTS THE ALBEDO AS VARIED, AND MEANS THAT TOO', () => {
+    // The water mask above is the shape of the trap this one is written
+    // against. Its hash is a hash of a constant, which is harmless because the
+    // manifest records that in a flag and this suite checks the flag.
+    //
+    // Albedo is the same hash with the flag pointing the other way, and it is
+    // far easier to break: a province field too coarse to vary inside a tile, a
+    // per-world offset that never reached the buffer, a quantisation that
+    // flattened the range. Each of those produces a buffer that hashes
+    // perfectly, matches on every platform, and is worth nothing. So the
+    // manifest records how many distinct values each fixture produced, and this
+    // asserts it against the real buffer in both directions.
+    const results = runFixtures(tsGenerator(), { size: QUICK_FIXTURES });
+    for (const r of results) {
+      expect(r.albedoDistinct, `fixture '${r.id}' albedo is nearly constant`).toBeGreaterThan(40);
+    }
+    // Unlike the water mask, no two worlds may share this hash. Ten identical
+    // albedo hashes is the failure, and it should be impossible to commit.
+    expect(new Set(results.map((r) => r.albedo)).size).toBe(results.length);
+    for (const [id, entry] of Object.entries(MANIFEST.fixtures)) {
+      expect(entry.albedoDistinctValues, `manifest fixture '${id}'`).toBeGreaterThan(40);
+    }
+    expect(new Set(Object.values(MANIFEST.fixtures).map((e) => e.albedo)).size).toBe(
+      Object.keys(MANIFEST.fixtures).length,
+    );
   });
 
   it('discriminates: a perturbed kernel turns the fixtures red', () => {
@@ -435,6 +464,16 @@ describe('fixture manifest comparison', () => {
       reason: 'differs',
     });
     expect(formatFixtureMismatches(mismatches)).toContain('materials');
+  });
+
+  it('names the albedo buffer too, and not by accident of ordering', () => {
+    // A buffer added to the manifest but not to the comparison loop would be a
+    // hash that is written and never read — recorded, diffed by nobody, and
+    // green whatever it holds.
+    const broken = results.map((r, i) => (i === 0 ? { ...r, albedo: 'deadbeef' } : r));
+    const mismatches = compareFixtureManifest(manifest, broken);
+    expect(mismatches).toHaveLength(1);
+    expect(mismatches[0]).toMatchObject({ buffer: 'albedo', reason: 'differs' });
   });
 
   it('reports a fixture that vanished from the run', () => {

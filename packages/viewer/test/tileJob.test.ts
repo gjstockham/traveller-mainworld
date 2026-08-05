@@ -253,9 +253,21 @@ describe.skipIf(!HAVE_WASM)('the seam swaps for the real WASM twin', () => {
     for (let i = 0; i < ts.response.positions.length; i++) {
       expect(wasm.response.positions[i], `position[${i}]`).toBe(ts.response.positions[i]);
     }
-    for (let i = 0; i < ts.response.colours.length; i++) {
-      expect(wasm.response.colours[i], `colour[${i}]`).toBe(ts.response.colours[i]);
-    }
+    // Colours are **not** compared, and were until WP11.
+    //
+    // They used to be a function of elevation and a Phase 0 elevation-band
+    // classification, both of which the twin computes. They are now a function
+    // of `albedo` and `materials`, which come out of the regolith pass — and the
+    // twin does not implement that pass any more than it implements the crater
+    // one, so it leaves both buffers as it found them. Comparing them would
+    // compare the TypeScript kernel against a zeroed allocation, and would fail
+    // for a reason that has nothing to do with arithmetic.
+    //
+    // Zeroing `densityScale` cannot rescue this the way it rescues elevation:
+    // the province field is there on a crater-free world too. So this is a
+    // genuine narrowing of what the twin still covers, in the same direction and
+    // for the same reason ADR-0001 recorded for the crater pass.
+    expect(wasm.response.colours.length).toBe(ts.response.colours.length);
   });
 
   it('diverges from the TypeScript kernel once craters are on, as the ADR expects', () => {

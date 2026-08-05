@@ -1,89 +1,109 @@
 {
-  "genVersion": "0.2.0-alpha.3",
+  "genVersion": "0.2.0-alpha.4",
   "fixtureSpecHash": "4f23f0304c09635f655300e099e1168b3f60da9e77bcdb1dbcb00ecdd8efd263",
   "fixtureN": 128,
   "tileCount": 90,
-  "digest": "288f33e13a74aef42257d147ea8a9ae9fe39ad62da31681d7fc67a92ca8d0e59",
+  "digest": "f6239e925cd1f16ff0c9c911473ac67a8bd68a7511501de00dce0f09af67ff4d",
   "fixtures": {
     "size1-rockball": {
       "elevation": "513049cc8cb2f49257cbdaad49d4eb6557f51c4663a8b3ceb28e9e2d3be24148",
       "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
-      "materials": "2b12775c78dc6e9054f12f61dbb68a73e54441a38b6d01c6a62167c7a4f50e5d",
+      "materials": "f80dfb7b29a6e7d88503dfc7028df13924b8c962f5e6af56993cff614b90bb85",
+      "albedo": "e07c881c29ab611788f535404eb28017a77fd60c68e84e9662286cc806c57679",
       "tiles": 90,
       "vertices": 1497690,
-      "waterMaskAllZero": true
+      "waterMaskAllZero": true,
+      "albedoDistinctValues": 222
     },
     "size2-cinder": {
       "elevation": "52eac10b0790f0a69b03a165cb1590a0cd297d30b3141c9a4a6935507fc99eac",
       "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
-      "materials": "adacb4da39f3b297314c6fc133b3e70cf9791ada84296bc7fa73c493a1c19bb6",
+      "materials": "60c89a71effa35e72e7202265c51f3394fd4eaf612be59aab87af168094e7441",
+      "albedo": "4f0080a0164c2ff393356bad58ad65c362921ff7c494965104edcace825f2ec0",
       "tiles": 90,
       "vertices": 1497690,
-      "waterMaskAllZero": true
+      "waterMaskAllZero": true,
+      "albedoDistinctValues": 222
     },
     "size3-ceres": {
       "elevation": "37362a307b8a102228c23ec6ecfa359667b46e4e160a9e027697b39fdffdc2a9",
       "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
-      "materials": "4f70b86825c4f9f6d34a998e13c0481535c6ae7cb2e7679c78f525dd9821db1d",
+      "materials": "a05c7c8d06078c1c7359c853a5161265cca668414e3347973aacce2dafc696fc",
+      "albedo": "aba1bc05a2cb8398b0191efa8b798db8046841d8a1c9749025ef3a7a4bfc0b45",
       "tiles": 90,
       "vertices": 1497690,
-      "waterMaskAllZero": true
+      "waterMaskAllZero": true,
+      "albedoDistinctValues": 222
     },
     "size4-luna": {
       "elevation": "b1005143cd5699f16777a3a9d0a9bc232e332c63a1e6ad9d325bc85fad8b31b1",
       "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
-      "materials": "6f9df4884c5555ae7bfec12e4840117b8296e42489931ee839a72ba901dbddd3",
+      "materials": "0f0d2930f53abe5bc7640154b7a3d1c7a8c07c1dd13b25a3456587f3c82173e0",
+      "albedo": "44dbc230fbf3f89bcbd032333276e0038d2d929f24651e1631c90a002395f54f",
       "tiles": 90,
       "vertices": 1497690,
-      "waterMaskAllZero": true
+      "waterMaskAllZero": true,
+      "albedoDistinctValues": 222
     },
     "size5-mercury": {
       "elevation": "f8ad70e1c0fc98e9c6563b0edde7fb68ae7d170bcd5c708dd668f1a18da7e64d",
       "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
-      "materials": "78ddc008403951c4172eb64cf2340e8ed9a6fa25b0ccfbc90b22beb205a0306b",
+      "materials": "8846ee49eb326db5703b08c5daab06b5c0a5338e120896981bce0e1d82442f87",
+      "albedo": "dbd813ca31874c4bd2b8bc992700fbe1bf477aec3db4739f80316e9faea13a0e",
       "tiles": 90,
       "vertices": 1497690,
-      "waterMaskAllZero": true
+      "waterMaskAllZero": true,
+      "albedoDistinctValues": 222
     },
     "size6-mars": {
       "elevation": "81a968e49ba8a1b104138eb45c26342a30fee2a6702203fec280e0f79249579d",
       "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
-      "materials": "e3b009752275c96cda68f7e241d12d07e2046152f3abb0e166970edf62f9358b",
+      "materials": "f2b1cfc6dcb7fd2ffcbde218c47c7b7385abd4edc087e1897bb0c6910d4bd95c",
+      "albedo": "0c416ea5e0b0bd758ee7b5557a3e8a1e0c98ebfb1ccb5d1b2c2a8ece7742c4da",
       "tiles": 90,
       "vertices": 1497690,
-      "waterMaskAllZero": true
+      "waterMaskAllZero": true,
+      "albedoDistinctValues": 222
     },
     "size7-temperate": {
       "elevation": "9d4ec2a98d8cfbfb1d189ac2cb17d4db7f1ede6ccd6af0322f45839863fec6fa",
       "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
-      "materials": "fcdab59432e33b44b145fbe8f850a0c0a849d776da064dd8777c39a746348e8e",
+      "materials": "ad5617d1b12eb9329e1e31fe167a73a29c2b3a32cc382dbc931a31f8a56c6dd7",
+      "albedo": "e894096973c2281752deda6493485d1f01a6309ac219dfc3f2fdb13b05650792",
       "tiles": 90,
       "vertices": 1497690,
-      "waterMaskAllZero": true
+      "waterMaskAllZero": true,
+      "albedoDistinctValues": 220
     },
     "size8-earthlike": {
       "elevation": "c481ea17d357189f36d2c8e5cc1653f872cc6225316d1bb22813c4b0fd2ecbf0",
       "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
-      "materials": "bb65e7f8278c452fd2d1f62ddcec52e32163b9fb6984f5d14247c67dcf37bc6f",
+      "materials": "fcdde1a309792c9644a57aed4d0e4475009f453cb613fd72a6ccad1fafba232c",
+      "albedo": "0024c4a11b8a7f0d2482abba0ee1cebd39d33667a154bc0d5b7400e5757a8fbd",
       "tiles": 90,
       "vertices": 1497690,
-      "waterMaskAllZero": true
+      "waterMaskAllZero": true,
+      "albedoDistinctValues": 220
     },
     "size9-large": {
       "elevation": "4336b0ce6def6854e776494863128e148a52b0e47eabce53b68348324d46dafe",
       "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
-      "materials": "ed384fe8fe09d8ac582c8992ddc276a206275d4efb60adaeffc1a67e2cad8f58",
+      "materials": "7547eef7fcf25d8d8bd80aae0d08689943187c71152636d6a5800113ee9c988f",
+      "albedo": "c810ab1409602c5cdecd8997e0e021c18ba93a01ef42a0d889b1a79421e3e9ee",
       "tiles": 90,
       "vertices": 1497690,
-      "waterMaskAllZero": true
+      "waterMaskAllZero": true,
+      "albedoDistinctValues": 208
     },
     "sizeA-maximal": {
       "elevation": "a08c44023246a1e8534d98334217c4bc14294539841b768fbb19e6da3b2b89b7",
       "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
-      "materials": "7d3247eb58f35a650b5770fa44a0f88c7fc8d3ea880469f691a5d1d197fa9d65",
+      "materials": "0daa5079d0e3db33630d976f40e9a413c0a8f88676d925122d77dfc1bd533d70",
+      "albedo": "f707f5ba235bca880c19822ce080bc74279ca2bb1bd8e8ad03cc3e8c18c9702e",
       "tiles": 90,
       "vertices": 1497690,
-      "waterMaskAllZero": true
+      "waterMaskAllZero": true,
+      "albedoDistinctValues": 208
     }
   }
 }

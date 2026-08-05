@@ -190,12 +190,27 @@ export interface FixtureResult {
   readonly waterMask: string;
   /** SHA-256 over every tile's material classification. */
   readonly materials: string;
+  /**
+   * SHA-256 over every tile's albedo bytes (WP11).
+   *
+   * **A constant buffer would hash perfectly and prove nothing**, in exactly the
+   * way {@link FixtureResult.waterMask} does — and albedo is far easier to get
+   * wrong that way than a water pass that does not exist yet: a palette offset
+   * that never reaches the buffer, a province field too coarse to vary within a
+   * tile, a quantisation that flattens the range. So this hash travels with
+   * {@link FixtureResult.albedoDistinct}, which records the opposite claim from
+   * the water mask's flag: not that the buffer *is* constant, but by how much it
+   * is not.
+   */
+  readonly albedo: string;
   /** Tiles evaluated. */
   readonly tiles: number;
   /** Vertices per buffer, across the whole tile set. */
   readonly vertices: number;
   /** Whether the water mask really was all zeros. See {@link FixtureResult.waterMask}. */
   readonly waterMaskAllZero: boolean;
+  /** Distinct albedo byte values across the run. See {@link FixtureResult.albedo}. */
+  readonly albedoDistinct: number;
 }
 
 /** Reusable buffers, so a ten-fixture run does not allocate ten times. */
@@ -204,6 +219,7 @@ export interface FixtureScratch {
   readonly elevation: Float64Array;
   readonly waterMask: Uint8Array;
   readonly materials: Uint8Array;
+  readonly albedo: Uint8Array;
 }
 
 /** Allocate the buffers one fixture run needs. */
@@ -217,6 +233,7 @@ export function allocateFixtureScratch(
     elevation: new Float64Array(total),
     waterMask: new Uint8Array(total),
     materials: new Uint8Array(total),
+    albedo: new Uint8Array(total),
   };
 }
 
@@ -250,12 +267,14 @@ export function runFixture(
     scratch.elevation.set(tile.elevation.subarray(0, per), offset);
     scratch.waterMask.set(tile.waterMask.subarray(0, per), offset);
     scratch.materials.set(tile.materials.subarray(0, per), offset);
+    scratch.albedo.set(tile.albedo.subarray(0, per), offset);
     offset += per;
   }
 
   const elevation = scratch.elevation.subarray(0, offset);
   const waterMask = scratch.waterMask.subarray(0, offset);
   const materials = scratch.materials.subarray(0, offset);
+  const albedo = scratch.albedo.subarray(0, offset);
 
   let waterMaskAllZero = true;
   for (let i = 0; i < waterMask.length; i++) {
@@ -265,14 +284,27 @@ export function runFixture(
     }
   }
 
+  // A 256-entry tally rather than a `Set`: the domain is a byte, and this runs
+  // over a million and a half values per fixture.
+  const seen = new Uint8Array(256);
+  let albedoDistinct = 0;
+  for (let i = 0; i < albedo.length; i++) {
+    if (seen[albedo[i]!] === 0) {
+      seen[albedo[i]!] = 1;
+      albedoDistinct++;
+    }
+  }
+
   return {
     id: fixture.id,
     elevation: sha256Hex(canonicalBytes(elevation)),
     waterMask: sha256Hex(canonicalBytesU8(waterMask)),
     materials: sha256Hex(canonicalBytesU8(materials)),
+    albedo: sha256Hex(canonicalBytesU8(albedo)),
     tiles: tiles.length,
     vertices: offset,
     waterMaskAllZero,
+    albedoDistinct,
   };
 }
 
@@ -399,7 +431,11 @@ export function fixtureSpecHash(
 /** Hash of the whole fixture run — one number to compare across platforms. */
 export function fixturesDigest(results: readonly FixtureResult[]): string {
   const joined = results
-    .map((r) => `${r.id}:elevation:${r.elevation}:waterMask:${r.waterMask}:materials:${r.materials}`)
+    .map(
+      (r) =>
+        `${r.id}:elevation:${r.elevation}:waterMask:${r.waterMask}:materials:${r.materials}` +
+        `:albedo:${r.albedo}`,
+    )
     .join('\n');
   return sha256Hex(asciiBytes(joined));
 }

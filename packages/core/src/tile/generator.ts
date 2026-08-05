@@ -12,7 +12,8 @@ import type { World } from '../spec.js';
 import { type TileGenOutput, allocateTileOutput, generateTile } from '../kernel/tilegen.js';
 import { tileBounds, tileFace } from '../kernel/tileid.js';
 
-export { Material, allocateTileOutput } from '../kernel/tilegen.js';
+export { Material } from '../kernel/regolith.js';
+export { allocateTileOutput } from '../kernel/tilegen.js';
 export type { TileGenOutput } from '../kernel/tilegen.js';
 
 /** A generated tile, immutable and keyed by `(tileId, genVersion)`. */

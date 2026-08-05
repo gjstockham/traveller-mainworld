@@ -292,7 +292,12 @@ export const BATTERY: readonly BatteryCase[] = Object.freeze([
           tiles.push(makeTileId(face, depth, path));
         }
       }
-      const out = new Float64Array(tiles.length * per * 2);
+      // Three buffers per vertex: elevation, material and albedo. Albedo joined
+      // in WP11 for the same reason materials was here from the start — this
+      // case is the composition of the kernel functions into what actually
+      // ships, and a hashed output it did not cover would be a hole in exactly
+      // the case named for closing them.
+      const out = new Float64Array(tiles.length * per * 3);
       let idx = 0;
       for (const id of tiles) {
         const tile = gen.generate(id, BATTERY_WORLD, n);
@@ -301,6 +306,9 @@ export const BATTERY: readonly BatteryCase[] = Object.freeze([
         }
         for (let i = 0; i < per; i++) {
           out[idx++] = tile.materials[i]!;
+        }
+        for (let i = 0; i < per; i++) {
+          out[idx++] = tile.albedo[i]!;
         }
       }
       return out;

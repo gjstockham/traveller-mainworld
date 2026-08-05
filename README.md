@@ -3,11 +3,11 @@
 A browser-based tool that turns a Universal Planetary Profile (UPP) plus a seed into a fully explorable 3D planet. Paste `C867A69-8`, get a world you can orbit, zoom into, and export as a projected 2D map.
 
 **Status:** Phase 1 (airless rocky worlds), in progress. Phase 0 is complete. The
-UPP parser, the `cepheus-1` interpretation layer and hierarchical crater fields
-have landed; the input UI, regolith palette, export package and share URLs have
-not. See [the PRD](docs/requirements/worldgen-prd.md) for scope.
+UPP parser, the `cepheus-1` interpretation layer, hierarchical crater fields and
+the regolith palette have landed; the input UI, export package and share URLs
+have not. See [the PRD](docs/requirements/worldgen-prd.md) for scope.
 
-The generator version is a **prerelease** (`0.2.0-alpha.3`) for the duration of
+The generator version is a **prerelease** (`0.2.0-alpha.4`) for the duration of
 Phase 1 — see [`CHANGELOG.md`](CHANGELOG.md) for why, and for what moves between
 re-pins.
 
@@ -19,6 +19,7 @@ re-pins.
 | `packages/core/src/kernel` | **The whitelisted zone** — see below. |
 | `packages/core/src/input` | UPP parsing and seed handling. No rules knowledge. |
 | `packages/core/src/ruleset` | `(UPP, ruleset) → PhysicalWorldSpec`. **All** rules knowledge, and the only OGL content. |
+| `packages/core/src/palette` | Surface scalars → RGB. **Outside** the whitelisted zone, and outside every hash. |
 | `packages/viewer` | Three.js cube-sphere viewer (Vite). |
 | `packages/golden` | Golden-hash battery, fixture worlds, manifests and runners. |
 | `crates/kernel-wasm` | Rust→wasm32 twin of the kernel. Must hash identically to it. |
@@ -356,6 +357,33 @@ Two independent checks enforce this, and both must be defeated to get a banned o
 
 1. `eslint.config.js` — `no-restricted-properties` / `no-restricted-syntax` scoped to `kernel/**`.
 2. `scripts/check-kernel-whitelist.mjs` — a source scan that does **not** honour `eslint-disable`, and additionally rejects any import that leaves the kernel directory.
+
+### Where the zone ends: `core/palette`
+
+The kernel emits **scalars** — an elevation in metres, a material class, an
+albedo byte — and every one of them reaches a golden hash. `packages/core/src/palette`
+turns those scalars into RGB, and none of *that* reaches a hash: no manifest
+records a colour, and no share URL has to reproduce one to the bit. So the
+whitelist does not govern it, and `Math.pow` there is unremarkable.
+
+The boundary is easy to get wrong in both directions, which is why it is written
+down here and in the module header. A reader who assumes the whitelist reaches
+this far will ban a harmless operation; a reader who assumes it governs nothing
+outside `kernel/` will import an approximation *into* the kernel to satisfy a
+rule that does not apply to the file they were editing. The test is simply
+whether the value can move a hash.
+
+The palette imports nothing from `kernel/` — not because a read-only import
+would be unsafe, but so the separation is checkable at a glance rather than by
+tracing every import; `packages/core/test/palette.test.ts` asserts it. The
+reverse direction needs no test, because `check-kernel-whitelist.mjs` already
+refuses any import that leaves the kernel directory.
+
+Palette tuning therefore costs no version bump and no manifest regeneration,
+which is correct: it changes how a world is *displayed*, not what it *is*. The
+same module is what WP13's exporter will colour a map through, so PRD §9.4 — the
+exported map matches the 3D view — is a property of there being one function
+rather than a coincidence of two staying in step.
 
 ## The WASM twin
 

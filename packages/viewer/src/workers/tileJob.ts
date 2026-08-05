@@ -8,7 +8,7 @@
  * can run the real WASM twin through the identical path and compare the
  * renderer-ready buffers. A seam nothing exercises is a comment.
  */
-import type { TileGenOutput, TileGenerator, World } from '@traveller-mainworld/core';
+import { type TileGenOutput, type TileGenerator, type World, worldPalette } from '@traveller-mainworld/core';
 
 import { buildTileColours, buildTilePositions, vertexCount } from '../mesh/tileMesh.js';
 import type { GenerateMessage, TileReadyMessage } from '../stream/protocol.js';
@@ -55,7 +55,17 @@ export function runTileJob(
     },
     positions,
   );
-  buildTileColours(tile.elevation, tile.materials, world.spec.terrainAmplitudeM, msg.n, colours);
+  // Derived per tile rather than passed in. It is a handful of integer mixes
+  // from the seed the tile was already generated with, so a cache would buy
+  // nothing and would be a second place for the viewer and the exporter to
+  // disagree about which world they are colouring.
+  buildTileColours(
+    tile.albedo,
+    tile.materials,
+    worldPalette(world.seedHi, world.seedLo),
+    msg.n,
+    colours,
+  );
 
   let minElevation = Infinity;
   let maxElevation = -Infinity;

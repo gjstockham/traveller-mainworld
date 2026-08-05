@@ -14,7 +14,7 @@
  * Acceptable for Phase 0/1 flat shading; revisit when Phase 2 adds water edges
  * and scattering.
  */
-import { lodStepBound } from '@traveller-mainworld/core';
+import { type WorldPalette, lodStepBound, writeSurfaceColour } from '@traveller-mainworld/core';
 
 /**
  * Vertices in a tile mesh: the `(n+1)²` grid, plus **two** skirt rings per edge.
@@ -274,23 +274,24 @@ export function buildTilePositions(
   }
 }
 
-/** Regolith palette by material class. Phase 1 replaces this with seed-varied tints. */
-const MATERIAL_COLOURS: readonly (readonly [number, number, number])[] = [
-  [0.28, 0.26, 0.24], // Lowland — dark basin regolith
-  [0.42, 0.39, 0.36], // Midland
-  [0.56, 0.53, 0.49], // Highland
-  [0.72, 0.7, 0.67], // Peak
-  [0.15, 0.25, 0.45], // Water (unused in Phase 0)
-];
-
 /**
- * Write per-vertex colours, tinted by material class and shaded slightly by
- * elevation within the class so relief reads even on a uniform material.
+ * Write per-vertex colours from the generator's own surface outputs.
+ *
+ * **The palette is not here.** WP11 moved it to `core/palette`, because WP13's
+ * exporter has to produce the same colour for the same sample and PRD §9.4 is a
+ * property only if there is one function that decides. What is left in this file
+ * is the mesh's business: which vertex gets which colour, and what the skirts do.
+ *
+ * The Phase 0 version shaded by `elevation / terrainAmplitudeM` within a
+ * material band. That stopped meaning anything when WP10 landed craters —
+ * `terrainAmplitudeM` no longer bounds elevation, so the shade term pinned at
+ * ±1 across most of a cratered surface — and the albedo byte replaces it with a
+ * value the generator actually thought about.
  */
 export function buildTileColours(
-  elevation: Float64Array,
+  albedo: Uint8Array,
   materials: Uint8Array,
-  amplitudeM: number,
+  palette: WorldPalette,
   n: number,
   out: Float32Array,
 ): void {
@@ -299,20 +300,8 @@ export function buildTileColours(
     throw new RangeError(`colours buffer holds ${out.length}, needs ${3 * vertexCount(n)}`);
   }
 
-  const shadeOf = (v: number): readonly [number, number, number] => {
-    const base = MATERIAL_COLOURS[materials[v]!] ?? MATERIAL_COLOURS[0]!;
-    // ±12% within the band, so slopes are legible without banding hard at the
-    // class boundaries.
-    const t = amplitudeM > 0 ? elevation[v]! / amplitudeM : 0;
-    const shade = 1 + Math.max(-1, Math.min(1, t)) * 0.12;
-    return [base[0] * shade, base[1] * shade, base[2] * shade];
-  };
-
   for (let v = 0; v < gridVerts; v++) {
-    const [r, g, b] = shadeOf(v);
-    out[v * 3] = r;
-    out[v * 3 + 1] = g;
-    out[v * 3 + 2] = b;
+    writeSurfaceColour(palette, materials[v]!, albedo[v]!, out, v * 3);
   }
 
   // Skirts take their edge vertex's colour *exactly*.
@@ -323,11 +312,8 @@ export function buildTileColours(
   // visible dark line tracing the whole quadtree. Matching the edge colour
   // means a sliver reads as terrain rather than as a seam.
   const writeSkirt = (e: number, k: number, gridV: number): void => {
-    const [r, g, b] = shadeOf(gridV);
     for (const s of [skirtTopIndex(n, e, k), skirtIndex(n, e, k)]) {
-      out[s * 3] = r;
-      out[s * 3 + 1] = g;
-      out[s * 3 + 2] = b;
+      writeSurfaceColour(palette, materials[gridV]!, albedo[gridV]!, out, s * 3);
     }
   };
 

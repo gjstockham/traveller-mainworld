@@ -147,7 +147,8 @@ function runFixtureLeg(): { results: ReturnType<typeof runFixtures>; digest: str
     onProgress: (r) => {
       out(
         `  ${r.id.padEnd(18)} elev ${r.elevation.slice(0, 12)}…  ` +
-          `mat ${r.materials.slice(0, 12)}…  water ${r.waterMask.slice(0, 12)}…` +
+          `mat ${r.materials.slice(0, 12)}…  alb ${r.albedo.slice(0, 12)}…` +
+          ` (${String(r.albedoDistinct)} values)  water ${r.waterMask.slice(0, 12)}…` +
           `${r.waterMaskAllZero ? ' (all zero)' : ''}\n`,
       );
     },

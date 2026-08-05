@@ -30,6 +30,110 @@ above is the copy that is, and the README repeats it.
 
 ---
 
+## 0.2.0-alpha.4 — regolith and materials
+
+**Both manifests moved.** WP11 adds a sixth output buffer and replaces the
+material classifier, so the battery's `tile.composite` case and every fixture's
+`materials` hash change. The fixture-spec hash does **not** move: the regolith
+pass reads `craters.regolithMaturity` and `craters.densityScale`, and both were
+already serialised by WP10.
+
+- **`albedo: Uint8Array` on `TileGenOutput`**, `(n+1)²`, hashed. A generated
+  output rather than a viewer decoration, so the mare/highland balance and the
+  ray systems are part of what a seed produces and what a share URL reproduces.
+  No apron: normals need elevation outside the tile, colours do not.
+
+- **`classify()` is gone, and it had been wrong since WP10.** Its four bands were
+  fractions of `terrainAmplitudeM`, which stopped bounding elevation the moment
+  craters landed — a basin floor sits about ten times that below the datum on a
+  Luna-sized world, so every vertex near a decent crater saturated the bottom
+  band and the material buffer had quietly become a low-resolution picture of
+  crater depth. The replacement is not relative to elevation at all: `Mare`,
+  `Regolith`, `Highland` and `Ejecta`, from an albedo province field and the
+  impact record. `Water` keeps slot 4 for Phase 2.
+
+- **`core/palette`, outside the whitelisted zone.** The kernel emits scalars; the
+  RGB mapping lives in one module that the viewer imports today and WP13's
+  exporter will import tomorrow. If they each had a copy, PRD §9.4 would be a
+  coincidence rather than a property. Tuning it costs no version bump, which is
+  correct — it changes how a world is displayed, not what it is. It imports
+  nothing from `kernel/`, and `palette.test.ts` checks that rather than trusting
+  the comment.
+
+- **A second walk over the crater candidates, not a wider composite return.**
+  `compositeCraters` returns metres and throws away which craters contributed;
+  albedo needs exactly that. Widening it would have grown a second output on the
+  hot path of both evaluation paths, where WP15's budget is already tight. The
+  second walk visits a small fraction of the list instead, and `CraterCandidates`
+  grew three fields for the offset vector the relief never reads.
+
+- **Albedo does not depend on LOD depth**, by one comparison: only the
+  always-on bands and the tier-1 basins contribute. A crack in the surface is
+  hidden by a skirt from behind; a step in *colour* along a tile edge is a
+  coloured line drawn over the planet with nothing behind it. The cost is that a
+  200 m crater gets no bright halo of its own at the range where you could see
+  one, and that is the cheaper half of the trade.
+
+- **Rays are a direction, not an angle.** The ray field is gradient noise sampled
+  on the unit offset from the crater's centre. That direction is constant along a
+  radial line, so rays come out as rays with no tangent frame, no angle and no
+  transcendental. They reach `SUPPORT_RATIO` — 2.2 crater radii — and no further,
+  because reaching past it would break the 3×3×3 neighbourhood lemma the whole
+  lattice scheme rests on. Real ray systems run much further; that is a 5×5×5
+  collection for the always-on bands, which is a work package and not a constant.
+
+- **WP10's crater field is scale-invariant, which nobody had noticed.** Every
+  radius in `craters.ts` is a fraction of the planetary radius and placement is on
+  the unit sphere, so `X100000-0` and `XA00000-0` at one seed carry the identical
+  crater pattern. The first version of this model read only scale-free quantities
+  and produced **bit-identical surfaces across Size 1 to A** — plan §6's
+  acceptance criterion failed outright, and silently, because the fixture set
+  gives each of its ten worlds a different seed and so cannot see it.
+
+  Two size-dependent terms fix it, both physical consequences of body size rather
+  than judgements about what a UPP code means: the fraction of basins that flood
+  rises with radius (Vesta and Ceres have no mare, Luna has a sixth of its
+  surface, Mercury has extensive smooth plains), and ejecta prominence falls with
+  it (ejecta leaves a low-gravity body faster than it falls back). Size 1 now
+  reads as bright uniformly-cratered highland with long rays; Size A as darker
+  plains with subdued ones. `regolith.test.ts` asserts distinctness *and*
+  monotonicity at a fixed seed, which is the only way to see the property at all.
+
+  **The underlying geometry is still scale-invariant**, and that is a WP10
+  question rather than a WP11 one — real impactor populations are absolute-sized,
+  not radius-fraction-sized. Related: WP10's "saturated at Size 1–2, sparse at
+  Size 9–A" is apparent size doing the work (the camera frames every world from
+  the same absolute altitude), not a property of the crater distribution. Worth
+  knowing before that acceptance line is cited.
+
+- **Two more things this got wrong first, both found by measurement.** Mare fill
+  was a subtraction, so three overlapping flooded basins drove the albedo negative
+  and a third of some fixtures came out as the same single byte; it is a
+  replacement now, and short of a total one so the fills keep some shading. And
+  the compositing-order test used twenty strong contributors whose sum saturated
+  the ejecta ceiling, so every ordering clamped to the same value and the test
+  stayed green with the canonical order deleted.
+
+- **The canonical order buys less here than it looks, and the code says so.**
+  Reordering a float sum moves it by ~1e-16; one albedo byte is 1/255. No
+  permutation of a realistic contributor set reaches a different byte — the
+  quantiser is what makes the two evaluation paths agree on colour, not the
+  ordering. The walk follows `order` anyway, for one line, because the day this
+  stops being a sum is the day ordering starts moving whole bytes.
+  `regolith.test.ts` asserts the insensitivity rather than the ordering, so it
+  goes red on exactly that change.
+
+- **The archived WASM twin no longer agrees on colours either.** It writes
+  neither `albedo` nor `materials`, and unlike the crater pass this cannot be
+  worked around by zeroing `densityScale` — the province field is there on a
+  crater-free world too. `tileJob.test.ts` compares positions and says so. Same
+  direction and same reason as the drift ADR-0001 accepted for WP10.
+
+- **The albedo hash carries a distinct-value count per fixture.** The water mask
+  records that it *is* constant; this records that albedo is not. A field that
+  silently collapsed would hash perfectly and identically across all ten worlds,
+  which is the water mask's situation with none of its honesty.
+
 ## Unreleased — `?upp=` in the viewer
 
 **No identity moved.** This is viewer routing: which world gets asked for, never

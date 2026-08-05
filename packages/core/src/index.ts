@@ -32,7 +32,7 @@
  * hashing what is being built, forfeiting the composition-bug catching it exists
  * for.
  */
-export const GEN_VERSION = '0.2.0-alpha.3';
+export const GEN_VERSION = '0.2.0-alpha.4';
 
 // Kernel — the whitelisted zone. See README for what may and may not go in here.
 export * from './kernel/ops.js';
@@ -44,7 +44,14 @@ export * from './kernel/fbm.js';
 export * from './kernel/tileid.js';
 export * from './kernel/cubesphere.js';
 export * from './kernel/craters.js';
+export * from './kernel/regolith.js';
 export * from './kernel/tilegen.js';
+
+// The regolith palette (PRD §9.4). Scalars come out of the kernel; the RGB
+// mapping lives here, outside the whitelisted zone, so that the viewer and the
+// exporter colour a sample through the same function and tuning it costs no
+// version bump. See the module header for the boundary.
+export * from './palette/index.js';
 
 // The input layer (PRD §6.1) — UPP parsing and seed handling. Feeds the ruleset
 // interpreter rather than the kernel: nothing here reaches a golden hash.

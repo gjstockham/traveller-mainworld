@@ -308,6 +308,8 @@ export function bandsForDepth(depth: number): number {
 export const LAYER_CRATER_BANDS = 1;
 /** Layer id for the tier-1 basin field. */
 export const LAYER_BASINS = 2;
+/** Layer id for the albedo province field (WP11). Its own stream, so it perturbs no relief. */
+export const LAYER_REGOLITH = 3;
 
 /**
  * Derive a per-layer 32-bit seed from the 64-bit world seed.
@@ -531,8 +533,16 @@ export const MAX_CANDIDATES = 27 * CANDIDATES_PER_CELL * MAX_BANDS + MAX_BASINS;
  * The craters affecting one sample, in canonical compositing order.
  *
  * Slots hold the *evaluated* geometry — normalised radial coordinate, radius,
- * age — rather than positions, because nothing downstream of the support test
- * needs a position again.
+ * age, and the offset from the crater's centre to the sample — rather than
+ * absolute positions, because nothing downstream of the support test needs to
+ * know where on the sphere either of them was.
+ *
+ * **The offset is carried for WP11's rays and nothing else.** The relief
+ * composite never reads it, so the elevation path pays three array stores and no
+ * arithmetic; `regolith.ts` normalises it and evaluates the ray field along it.
+ * Storing the offset rather than an angle is what keeps that cost on the path
+ * that wants it: deriving a per-crater tangent frame in {@link addIfInSupport}
+ * would charge every elevation sample for a colour it never asks for.
  *
  * The sort key is `(band, age hash, ix, iy, iz)` compared lexicographically, and
  * it is total: one candidate slot per cell per band, so no two entries can tie
@@ -552,6 +562,10 @@ export class CraterCandidates {
   readonly radius = new Float64Array(MAX_CANDIDATES);
   /** Age in `[0, 1)`; 0 is oldest. */
   readonly age = new Float64Array(MAX_CANDIDATES);
+  /** Offset from the crater's projected centre to the sample, in unit-sphere units. */
+  readonly dx = new Float64Array(MAX_CANDIDATES);
+  readonly dy = new Float64Array(MAX_CANDIDATES);
+  readonly dz = new Float64Array(MAX_CANDIDATES);
 
   /**
    * Sort key word 0: the scale bucket.
@@ -587,6 +601,9 @@ export class CraterCandidates {
     t: number,
     radius: number,
     age: number,
+    dx: number,
+    dy: number,
+    dz: number,
     keyBand: number,
     keyAge: number,
     keyX: number,
@@ -604,6 +621,9 @@ export class CraterCandidates {
     this.t[slot] = t;
     this.radius[slot] = radius;
     this.age[slot] = age;
+    this.dx[slot] = dx;
+    this.dy[slot] = dy;
+    this.dz[slot] = dz;
     this.keyBand[slot] = keyBand;
     this.keyAge[slot] = keyAge;
     this.keyX[slot] = keyX;
@@ -798,7 +818,7 @@ function addIfInSupport(
   if (d2 >= reach * reach) {
     return;
   }
-  into.add(Math.sqrt(d2) / radius, radius, age, band, ageHash, ix, iy, iz);
+  into.add(Math.sqrt(d2) / radius, radius, age, dx, dy, dz, band, ageHash, ix, iy, iz);
 }
 
 /**
@@ -1143,8 +1163,13 @@ function craterDepthRatio(diameter: number, transitionDiameter: number): number 
  * Phase 4 couples this to the erosion regime. Phase 1 keeps every airless world
  * near-saturated and crisp, which is what {@link CraterParams.regolithMaturity}
  * being the only modifier means in practice.
+ *
+ * Exported so WP11's albedo reads the *same* freshness the relief does. A
+ * second definition would let a crater be shallow-and-old in the geometry and
+ * bright-and-young in the colour, which is a contradiction nobody would spot
+ * from a hash.
  */
-function freshness(age: number, regolithMaturity: number): number {
+export function freshness(age: number, regolithMaturity: number): number {
   const floor = 0.35 * (1 - 0.5 * regolithMaturity);
   return lerp(floor, 1, age);
 }
@@ -1218,8 +1243,11 @@ function complexProfile(t: number, depth: number, rim: number): number {
  * the surface it is cut into. This is plan §5.4's `h = lerp(h, floor, coverage)`
  * and it is the single biggest contributor to whether the result reads as Luna
  * or as a lumpy sum.
+ *
+ * Exported for WP11: a flooded basin's mare fills exactly the region this
+ * covers, because that is the region the impact resurfaced.
  */
-function craterCoverage(t: number): number {
+export function craterCoverage(t: number): number {
   if (t >= 1) {
     return 0;
   }

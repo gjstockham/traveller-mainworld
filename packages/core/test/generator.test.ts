@@ -4,7 +4,7 @@ import { GEN_VERSION } from '../src/index.js';
 import { bandsForDepth, lodStepBound } from '../src/kernel/craters.js';
 import { DEFAULT_FBM } from '../src/kernel/fbm.js';
 import { interpretText } from '../src/ruleset/interpret.js';
-import { Material } from '../src/kernel/tilegen.js';
+import { Material } from '../src/kernel/regolith.js';
 import { makeTileId, rootTiles, tileChild } from '../src/kernel/tileid.js';
 import type { World } from '../src/spec.js';
 import { TsTileGenerator } from '../src/tile/generator.js';

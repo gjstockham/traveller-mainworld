@@ -268,12 +268,14 @@ function onFixture(result: FixtureResult, done: number): void {
     expected !== undefined &&
     expected.elevation === result.elevation &&
     expected.materials === result.materials &&
+    expected.albedo === result.albedo &&
     expected.waterMask === result.waterMask;
   appendRow(fixturesEl, ok, [
     result.id,
     ok ? 'match' : expected === undefined ? 'not in manifest' : 'DIFFERS',
     `${result.elevation.slice(0, 12)}…`,
     `${result.materials.slice(0, 12)}…`,
+    `${result.albedo.slice(0, 12)}…`,
     result.waterMaskAllZero ? 'all zero' : 'NON-ZERO',
   ]);
   setStatus('running', `Fixtures… ${String(done)} of ${String(plan.fixtures.length)} worlds`);

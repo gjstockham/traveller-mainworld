@@ -48,6 +48,7 @@ export interface FixtureEntry {
   readonly elevation: string;
   readonly waterMask: string;
   readonly materials: string;
+  readonly albedo: string;
   readonly tiles: number;
   readonly vertices: number;
   /**
@@ -61,6 +62,18 @@ export interface FixtureEntry {
    * the day it stops being true the suite says so.
    */
   readonly waterMaskAllZero: boolean;
+  /**
+   * How many distinct albedo bytes this fixture produced.
+   *
+   * The mirror image of {@link FixtureEntry.waterMaskAllZero}, and recorded for
+   * the same reason from the opposite direction. The water-mask flag stops a
+   * hash of a constant reading as coverage; this stops an albedo hash reading as
+   * coverage *before* it is one. A field that silently collapsed — a province
+   * frequency too low to vary inside a tile, a palette offset that never reached
+   * the buffer — would hash perfectly and identically across all ten worlds, and
+   * this number is what turns that into a visible diff and a red test.
+   */
+  readonly albedoDistinctValues: number;
 }
 
 export interface FixtureManifest {
@@ -101,9 +114,11 @@ export function buildFixtureManifest(
       elevation: r.elevation,
       waterMask: r.waterMask,
       materials: r.materials,
+      albedo: r.albedo,
       tiles: r.tiles,
       vertices: r.vertices,
       waterMaskAllZero: r.waterMaskAllZero,
+      albedoDistinctValues: r.albedoDistinct,
     };
   }
   return {
@@ -187,7 +202,7 @@ export function compareFixtureManifest(
       });
     }
 
-    for (const buffer of ['elevation', 'waterMask', 'materials'] as const) {
+    for (const buffer of ['elevation', 'waterMask', 'materials', 'albedo'] as const) {
       if (expected[buffer] !== r[buffer]) {
         mismatches.push({
           fixture: r.id,

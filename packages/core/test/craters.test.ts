@@ -371,7 +371,7 @@ function collectWide(
           const dist2 = ex * ex + ey * ey + ez * ez;
           const reach = SUPPORT_RATIO * r;
           if (dist2 >= reach * reach) continue;
-          into.add(Math.sqrt(dist2) / r, r, hashToUnit(w), band, w | 0, ix, iy, iz);
+          into.add(Math.sqrt(dist2) / r, r, hashToUnit(w), ex, ey, ez, band, w | 0, ix, iy, iz);
         }
       }
     }
@@ -534,7 +534,11 @@ describe('canonical compositing order', () => {
     const forward = new CraterCandidates();
     const backward = new CraterCandidates();
 
-    const entries: [number, number, number, number, number, number, number, number][] = [];
+    const entries: [
+      number, number, number,
+      number, number, number,
+      number, number, number, number, number,
+    ][] = [];
     for (let i = 0; i < 24; i++) {
       const w = mix32(0x5bf03635 + i * 0x9e3779b1);
       const band = Math.floor(i / 6); // four bands, six overlapping craters each
@@ -543,6 +547,11 @@ describe('canonical compositing order', () => {
         hashToUnit(mix32(w)) * 0.8,
         bandMinRadius(band) * (1 + hashToUnit(mix32(w + 1))),
         hashToUnit(mix32(w + 2)),
+        // The offset. Never read by the relief composite; `regolith.test.ts`
+        // covers the walk that does read it.
+        0,
+        0,
+        0,
         band,
         mix32(w + 3) | 0,
         (mix32(w + 4) | 0) % 97,
@@ -566,9 +575,9 @@ describe('canonical compositing order', () => {
 
   it('composites oldest first', () => {
     const list = new CraterCandidates();
-    list.add(0.1, 0.001, 0.9, 0, 900, 0, 0, 0);
-    list.add(0.1, 0.001, 0.1, 0, 100, 1, 0, 0);
-    list.add(0.1, 0.001, 0.5, 0, 500, 2, 0, 0);
+    list.add(0.1, 0.001, 0.9, 0, 0, 0, 0, 900, 0, 0, 0);
+    list.add(0.1, 0.001, 0.1, 0, 0, 0, 0, 100, 1, 0, 0);
+    list.add(0.1, 0.001, 0.5, 0, 0, 0, 0, 500, 2, 0, 0);
     expect([...list.order.subarray(0, 3)].map((s) => list.age[s])).toEqual([0.1, 0.5, 0.9]);
   });
 
@@ -577,11 +586,11 @@ describe('canonical compositing order', () => {
     // worth of cells. Falling back to insertion order there is exactly the
     // list-dependence §5.3 forbids, so the tiebreak has to be total.
     const forward = new CraterCandidates();
-    forward.add(0.2, 0.001, 0.4, 1, 77, 9, 0, 0);
-    forward.add(0.2, 0.001, 0.4, 1, 77, 4, 0, 0);
+    forward.add(0.2, 0.001, 0.4, 0, 0, 0, 1, 77, 9, 0, 0);
+    forward.add(0.2, 0.001, 0.4, 0, 0, 0, 1, 77, 4, 0, 0);
     const backward = new CraterCandidates();
-    backward.add(0.2, 0.001, 0.4, 1, 77, 4, 0, 0);
-    backward.add(0.2, 0.001, 0.4, 1, 77, 9, 0, 0);
+    backward.add(0.2, 0.001, 0.4, 0, 0, 0, 1, 77, 4, 0, 0);
+    backward.add(0.2, 0.001, 0.4, 0, 0, 0, 1, 77, 9, 0, 0);
     expect(forward.keyX[forward.order[0]!]).toBe(4);
     expect(backward.keyX[backward.order[0]!]).toBe(4);
   });
@@ -591,8 +600,8 @@ describe('canonical compositing order', () => {
     // as a sign would order half the craters before all the others on a bit with
     // no meaning — and it would still look like a total order.
     const list = new CraterCandidates();
-    list.add(0.2, 0.001, 0.9, 0, 0x80000000 | 0, 0, 0, 0);
-    list.add(0.2, 0.001, 0.1, 0, 0x00000001, 1, 0, 0);
+    list.add(0.2, 0.001, 0.9, 0, 0, 0, 0, 0x80000000 | 0, 0, 0, 0);
+    list.add(0.2, 0.001, 0.1, 0, 0, 0, 0, 0x00000001, 1, 0, 0);
     expect(list.keyAge[list.order[0]!]! >>> 0).toBe(1);
   });
 
@@ -602,8 +611,10 @@ describe('canonical compositing order', () => {
 
   it('throws rather than truncating if that bound is ever wrong', () => {
     const list = new CraterCandidates();
-    for (let i = 0; i < MAX_CANDIDATES; i++) list.add(0.5, 0.001, i / MAX_CANDIDATES, 0, i, i, 0, 0);
-    expect(() => list.add(0.5, 0.001, 0.5, 0, 1, 0, 0, 0)).toThrow(/capacity/);
+    for (let i = 0; i < MAX_CANDIDATES; i++) {
+      list.add(0.5, 0.001, i / MAX_CANDIDATES, 0, 0, 0, 0, i, i, 0, 0);
+    }
+    expect(() => list.add(0.5, 0.001, 0.5, 0, 0, 0, 0, 1, 0, 0, 0)).toThrow(/capacity/);
   });
 });
 

@@ -6,6 +6,7 @@ import {
   interpretText,
   lodStepBound,
   makeTileId,
+  worldPalette,
 } from '@traveller-mainworld/core';
 import { describe, expect, it } from 'vitest';
 
@@ -24,6 +25,7 @@ const WORLD: World = {
   seedLo: 0x5678,
 };
 
+const PALETTE = worldPalette(WORLD.seedHi, WORLD.seedLo);
 const RADIUS = 1;
 const ELEV_SCALE = 25 / (WORLD.spec.radiusKm * 1000); // 25x exaggeration
 const gen = new TsTileGenerator(GEN_VERSION);
@@ -303,7 +305,7 @@ describe('colours', () => {
     const n = 8;
     const tile = gen.generate(makeTileId(1, 0, 0), WORLD, n);
     const colours = new Float32Array(3 * vertexCount(n));
-    buildTileColours(tile.elevation, tile.materials, WORLD.spec.terrainAmplitudeM, n, colours);
+    buildTileColours(tile.albedo, tile.materials, PALETTE, n, colours);
     for (const c of colours) {
       expect(c).toBeGreaterThan(0);
       expect(c).toBeLessThanOrEqual(1);
@@ -318,7 +320,7 @@ describe('colours', () => {
     const n = 4;
     const tile = gen.generate(makeTileId(1, 0, 0), WORLD, n);
     const colours = new Float32Array(3 * vertexCount(n));
-    buildTileColours(tile.elevation, tile.materials, WORLD.spec.terrainAmplitudeM, n, colours);
+    buildTileColours(tile.albedo, tile.materials, PALETTE, n, colours);
     const gridVerts = (n + 1) * (n + 1);
     for (let i = 0; i <= n; i++) {
       for (const skirt of [gridVerts + i, gridVerts + 4 * (n + 1) + i]) {

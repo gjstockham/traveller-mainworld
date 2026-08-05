@@ -14,14 +14,20 @@
  * 1. Directions and the base fBm field, over the **apron** grid, tracking the
  *    tile's 3D bounding box.
  * 2. Crater relief, over the same grid, out of a lattice cache built from that
- *    bounding box.
- * 3. The interior copy: elevation, water mask and material classification.
+ *    bounding box — and, for interior samples only, the regolith surface.
+ * 3. The interior copy: elevation and water mask.
  *
  * Pass 1 has to finish before the crater lattice can be built, because the
  * cache is sized from the box. Pass 2 recomputes each direction rather than
  * storing 3·(n+3)² doubles from pass 1 — `faceUvToDirection` is two tangent
  * warps and a square root, which is a rounding error next to the crater work it
  * feeds.
+ *
+ * **The surface lands in pass 2 rather than pass 3** because it is a function of
+ * the crater candidates, and pass 2 is where the candidate list for a sample
+ * exists. Deferring it would mean collecting every sample's craters twice.
+ * Only interior samples pay it: the apron ring exists for WP12's normals, which
+ * need elevation outside the tile and never a colour.
  */
 import { faceUvToDirection } from './cubesphere.js';
 import {
@@ -39,16 +45,8 @@ import {
   craterParams,
 } from './craters.js';
 import { type FbmParams, fbm3, fbmNormalisation } from './fbm.js';
+import { regolithParams, surfaceAlbedo, surfaceAt, surfaceMaterial } from './regolith.js';
 import { MAX_DEPTH } from './tileid.js';
-
-/** Phase 0 material classes. Airless rocky worlds only; water is Phase 2. */
-export const Material = {
-  Lowland: 0,
-  Midland: 1,
-  Highland: 2,
-  Peak: 3,
-  Water: 4,
-} as const;
 
 /**
  * Rings of elevation generated beyond the tile on every side.
@@ -146,8 +144,21 @@ export interface TileGenOutput {
   readonly elevation: Float64Array;
   /** `(n+1)²` flags; always 0 in Phase 1 (airless worlds). */
   readonly waterMask: Uint8Array;
-  /** `(n+1)²` {@link Material} values. */
+  /** `(n+1)²` `Material` values, from `regolith.ts`. */
   readonly materials: Uint8Array;
+  /**
+   * `(n+1)²` albedo bytes, 0–255.
+   *
+   * A **hashed generator output**, not a viewer decoration: the mare/highland
+   * balance and the ray systems are part of what a seed produces, so they are
+   * part of what a golden fixture pins and what a share URL reproduces. The
+   * mapping from this byte to an RGB colour is not — that lives in
+   * `core/palette`, outside the whitelisted zone, and tuning it costs no version
+   * bump because it changes how a world is displayed and not what it is.
+   *
+   * No apron. Normals need elevation outside the tile; colours do not.
+   */
+  readonly albedo: Uint8Array;
   /** `3(n+1)²` interleaved unit direction vectors, for the renderer. */
   readonly directions: Float64Array;
   /**
@@ -175,6 +186,7 @@ export function allocateTileOutput(n: number): TileGenOutput {
     elevation: new Float64Array(count),
     waterMask: new Uint8Array(count),
     materials: new Uint8Array(count),
+    albedo: new Uint8Array(count),
     directions: new Float64Array(count * 3),
     apronElevation: new Float64Array(apron),
   };
@@ -255,7 +267,7 @@ export function generateTile(input: TileGenInput, out: TileGenOutput): void {
   const stride = apronStride(n);
   const apronCount = stride * stride;
 
-  if (out.elevation.length < count || out.materials.length < count) {
+  if (out.elevation.length < count || out.materials.length < count || out.albedo.length < count) {
     throw new RangeError(`output buffers hold too few elements for n=${n}`);
   }
   if (out.apronElevation.length < apronCount) {
@@ -287,6 +299,7 @@ export function generateTile(input: TileGenInput, out: TileGenOutput): void {
   BASIN_STORE = buildBasins(input.seedHi, input.seedLo, craters.densityScale, BASIN_STORE);
   const basins = BASIN_STORE;
   const bandSeed = craterLayerSeed(input.seedHi, input.seedLo, LAYER_CRATER_BANDS);
+  const regolith = regolithParams(input.seedHi, input.seedLo, craters);
 
   const lo = -APRON_RING;
   const hi = n + APRON_RING;
@@ -366,22 +379,30 @@ export function generateTile(input: TileGenInput, out: TileGenOutput): void {
       // path sums a base that has been through a Float64 store, and these two
       // have to agree to the bit.
       out.apronElevation[k] = out.apronElevation[k]! + compositeCraters(CANDIDATES, craters);
+
+      // The surface, off the same candidate list. Interior only: the apron ring
+      // is there so WP12 can take a normal at a tile's edge vertex, and a normal
+      // needs elevation outside the tile where a colour does not.
+      if (i >= 0 && i <= n && j >= 0 && j <= n) {
+        const g = j * (n + 1) + i;
+        const surface = surfaceAt(d.x, d.y, d.z, CANDIDATES, craters, regolith);
+        out.materials[g] = surfaceMaterial(surface);
+        out.albedo[g] = surfaceAlbedo(surface);
+      }
     }
   }
 
-  // --- pass 3: the interior, and the classifications derived from it ---
+  // --- pass 3: the interior elevation, and the water mask ---
   let g = 0;
   for (let j = 0; j <= n; j++) {
     for (let i = 0; i <= n; i++) {
-      const h = out.apronElevation[apronIndex(n, i, j)]!;
-      out.elevation[g] = h;
+      out.elevation[g] = out.apronElevation[apronIndex(n, i, j)]!;
 
       // Water pass. Trivially empty for airless worlds, but kept in the loop
       // so Phase 2 does not change the shape of the hot path — and so Spike B
       // measures the loop that will actually ship.
       out.waterMask[g] = 0;
 
-      out.materials[g] = classify(h, amplitudeM);
       g++;
     }
   }
@@ -434,25 +455,48 @@ export function sampleElevation(
 }
 
 /**
- * Elevation-band material classification.
+ * The surface at one position — the point-sample path's counterpart to
+ * {@link sampleElevation}, and what WP13's exporter colours a map from.
  *
- * Bands are fractions of the tile's relief rather than absolute metres, so the
- * classification means the same thing on a Size-1 rockball and a Size-A world.
- * Phase 4 replaces this with the climate-field classifier.
+ * Returns a packed code; read it with `surfaceMaterial` and `surfaceAlbedo`.
+ * Bit-identical to what {@link generateTile} writes at the same vertex, and
+ * asserted so over the whole fixture tile set — which is what makes PRD §9.4's
+ * "the exported map matches the 3D view" a property of the colours as well as of
+ * the geometry.
+ *
+ * `depth` is taken for symmetry with {@link sampleElevation} and because a
+ * caller sampling both wants one signature, **not because the answer depends on
+ * it**: `regolith.ts` filters to the always-on bands, so the surface at a
+ * position is the same at every depth. A test asserts that rather than leaving
+ * it as a claim.
  */
-function classify(elevationM: number, amplitudeM: number): number {
-  if (amplitudeM <= 0) {
-    return Material.Lowland;
-  }
-  const t = elevationM / amplitudeM;
-  if (t < -0.15) {
-    return Material.Lowland;
-  }
-  if (t < 0.1) {
-    return Material.Midland;
-  }
-  if (t < 0.3) {
-    return Material.Highland;
-  }
-  return Material.Peak;
+export function sampleSurface(
+  x: number,
+  y: number,
+  z: number,
+  depth: number,
+  input: PointSampleInput,
+  basins: BasinField,
+  scratch: CraterCandidates,
+  cull?: BasinCull,
+): number {
+  const craters = craterParams(
+    input.radiusKm,
+    input.craterDensityScale,
+    input.craterTransitionDiameterKm,
+    input.regolithMaturity,
+  );
+  const bandSeed = craterLayerSeed(input.seedHi, input.seedLo, LAYER_CRATER_BANDS);
+
+  scratch.reset();
+  collectBasins(scratch, x, y, z, basins, cull);
+  collectFromLattice(scratch, x, y, z, bandsForDepth(depth), craters.densityScale, bandSeed);
+  return surfaceAt(
+    x,
+    y,
+    z,
+    scratch,
+    craters,
+    regolithParams(input.seedHi, input.seedLo, craters),
+  );
 }
