@@ -16,7 +16,7 @@ import { skirtMaskFor } from './lod/neighbours.js';
 import { DEFAULT_LOD, type LodParams, selectTiles } from './lod/quadtree.js';
 import { skirtDepthFor } from './mesh/tileMesh.js';
 import { elevationScaleFor, exaggerationFrom } from './render/exaggeration.js';
-import { PlanetRenderer, createScene } from './render/planet.js';
+import { MESH_PROBE_COLOUR, PlanetRenderer, createScene } from './render/planet.js';
 import { TileStore } from './stream/tileStore.js';
 import { chooseWorld } from './world/choice.js';
 
@@ -80,7 +80,12 @@ function main(): void {
   const { scene, camera, renderer, sun } = createScene(canvas, {
     preserveDrawingBuffer: params.has('debug'),
   });
-  const planet = new PlanetRenderer({ n: TILE_N });
+  const planet = new PlanetRenderer({
+    n: TILE_N,
+    // `?meshprobe=1` — see MESH_PROBE_COLOUR. Splits the three hypotheses for the
+    // black-flicker finding in docs/evidence/spikec-exit.md.
+    ...(params.has('meshprobe') ? { initialColour: MESH_PROBE_COLOUR } : {}),
+  });
   scene.add(planet.group);
 
   // Altitude in radii, from a fixed altitude in kilometres, so that a small

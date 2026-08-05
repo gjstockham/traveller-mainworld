@@ -16,7 +16,39 @@ export interface PlanetRendererOptions {
   readonly n: number;
   /** Maximum retired meshes kept for reuse. */
   readonly poolSize?: number;
+  /**
+   * Colour a freshly-created mesh's vertex-colour attribute is filled with
+   * before any tile data is written into it. See {@link MESH_PROBE_COLOUR}.
+   *
+   * Undefined means the attribute is left as allocated — all zeros, which is
+   * black.
+   */
+  readonly initialColour?: readonly [number, number, number];
 }
+
+/**
+ * The mesh probe: magenta where a mesh would otherwise draw an unwritten
+ * colour buffer.
+ *
+ * `docs/evidence/spikec-exit.md` records an open finding — tiles occasionally
+ * flicker black while zooming — with three hypotheses and one cheap test that
+ * splits them: make the *unwritten* colour black into something no shading path
+ * can produce. A skirt caught face-on is barely lit and renders near-black; an
+ * unpopulated or stale buffer renders whatever the buffer holds. So:
+ *
+ * - flash turns **magenta** → the mesh drew before {@link PlanetRenderer.upsert}
+ *   wrote its colours (hypothesis 2), or a pooled mesh was reattached before it
+ *   was refilled (hypothesis 3);
+ * - flash stays **black** → the buffer was populated and the black is geometry:
+ *   a skirt wall seen face-on (hypothesis 1).
+ *
+ * It is a URL parameter rather than a scratch edit because the artefact is
+ * occasional: it may take several minutes of flying to see once, and the check
+ * has to survive being re-run on the Windows side days later. `?meshprobe=1`.
+ *
+ * Presentation only — it cannot reach generated data or a hash.
+ */
+export const MESH_PROBE_COLOUR: readonly [number, number, number] = [1, 0, 1];
 
 export class PlanetRenderer {
   readonly group = new THREE.Group();
@@ -173,7 +205,17 @@ export class PlanetRenderer {
     const verts = vertexCount(this.options.n);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts * 3), 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(verts * 3), 3));
+
+    const colours = new Float32Array(verts * 3);
+    const initial = this.options.initialColour;
+    if (initial !== undefined) {
+      for (let v = 0; v < verts; v++) {
+        colours[v * 3] = initial[0];
+        colours[v * 3 + 1] = initial[1];
+        colours[v * 3 + 2] = initial[2];
+      }
+    }
+    geometry.setAttribute('color', new THREE.BufferAttribute(colours, 3));
     // Shared across every tile with the same skirt mask, so at most sixteen
     // index buffers exist on the GPU regardless of tile count.
     geometry.setIndex(this.indexAttributes[0b1111]!);

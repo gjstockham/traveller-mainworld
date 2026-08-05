@@ -105,6 +105,14 @@ which is the opposite of the goal.
 an inspection tool, not a display default. It is a display choice either way and
 cannot touch generated data or a hash.
 
+`?meshprobe=1` fills a newly-created tile mesh's vertex-colour buffer with
+magenta instead of leaving it zeroed. It exists for the open finding in
+[docs/evidence/spikec-exit.md](docs/evidence/spikec-exit.md) — tiles occasionally
+flicker black while zooming — and splits its three hypotheses in one flight: a
+**magenta** flash is a mesh drawn before its colours were written, or a pooled
+mesh reattached before it was refilled; a flash that stays **black** is geometry,
+almost certainly a skirt wall caught face-on. Presentation only.
+
 What this exposes is that almost everything currently visible on these worlds
 was displacement. At true scale they are smooth spheres with four hard-edged
 albedo bands, because the things that give a real body its face are not built
