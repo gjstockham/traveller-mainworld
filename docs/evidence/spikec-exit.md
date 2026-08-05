@@ -16,11 +16,17 @@ show.
 > the measuring; it is not a substitute for it. A criterion that was not measured
 > is recorded as **not measured** — never inferred from the four that were.
 
-> **Status, 2026-08-04:** C1, C3, C4 and C5 are measured and pass, on build
-> `e444dc8`. **C2 — seams and cracks — is not measured**, and it is the one
-> criterion no instrument can supply. Phase 0's exit therefore rests on it, the
-> same way ADR-0001's promotion rested on M1: fill it, or accept it on the record
-> with reasoning. Do not close Phase 0 by counting four out of five.
+> **Status, 2026-08-05:** all five criteria are measured and pass. C1, C3, C4
+> and C5 on build `e444dc8`; **C2 observed on build `2aac354` and recorded
+> below** — six depth pairs from 1/2 to 6/7, side lighting, no seam found at any
+> of them and none on the cube-face edges either.
+>
+> **One artefact was seen and is not a seam:** tiles occasionally flicker black
+> while zooming. It is recorded as an open finding under C2's notes rather than
+> folded into the pass, because it is a real observation about the renderer and
+> the one thing that would hide it is calling it cosmetic. It does not meet the
+> wording of C2 — a flicker is not a crack or a seam at a boundary — and it
+> cannot reach a hash, being downstream of generation entirely.
 
 ## What is measured, and with what
 
@@ -122,7 +128,7 @@ stated. Blocks A and B are earlier runs, kept for what they show.
 | # | Criterion (spike plan §C.2) | Measured | Result |
 |---|---|---|---|
 | C1 | Fly full-disc orbit → close range over a Size-8 world, tiles streaming throughout | Descended from 20.7 Mm (block A, ~3.2 radii, full disc) to **12.8 km altitude at depth 7**; 40 tiles visible, 363 cached, 39.4 MiB streamed, 100% hit rate, nothing queued or cancelled at rest | **PASS** |
-| C2 | No visible crack or seam at any LOD boundary | — | **not measured** |
+| C2 | No visible crack or seam at any LOD boundary | Author's observation, build `2aac354`, `size8-earthlike` at true scale, side-lit (sun ~90° right of view): **no seam at depth pairs 1/2, 2/3, 3/4, 4/5, 5/6 or 6/7**, and none distinguishable on the twelve cube-face edges either — so the faint edge seam the README predicts was not reachable in normal use. Separate artefact recorded below | **PASS**, with an open finding |
 | C3 | No stall > 1 s | **Worst frame 18 ms** across an uninterrupted 10m 50s session (bare `session` line and no excluded frames ⇒ the tab never went hidden) | **PASS** |
 | C4 | ~60 fps target, 30 fps floor, on the integrated-GPU laptop | **60 fps mean (16.7 ms), 16.9 ms p95**, measured at depth 7 rather than at orbit | **PASS** |
 | C5 | Memory stable over a 10-minute session | Heap `+43.2 MiB` over 10m 47s against `39.4 MiB` tiles + `13.0 MiB` mesh resident; no allocation activity at rest. See the argument below | **PASS**, with a stated limitation |
@@ -153,15 +159,21 @@ steadily throughout" are not distinguishable from one block. The three bullets
 above are what makes the first reading the better-supported one; a sampled trend
 would settle it outright and does not exist.
 
-**C2 is the one still open.** It is the criterion no instrument can supply, and
-it needs a specific description rather than an impression: which LOD boundaries
-were inspected, at what sun angle, and whether the twelve cube-edge seams (open
-question 2) were distinguishable from LOD-level seams. Skirts are drawn
-unconditionally across cube-face edges today and a faint seam is *expected*
-there; a seam anywhere else is a finding. The author's general impression that
-the fixtures look right is recorded in the project history but is deliberately
-**not** entered here as C2 — that is the exact substitution this file opens by
-refusing.
+**C2 is measured, and it is the one criterion no instrument could supply.** The
+description asked for three things and got them: six depth pairs from 1/2 to
+6/7, side lighting rather than a sub-solar flypast, and an explicit answer on
+the cube-face edges. Skirts are drawn unconditionally across those twelve edges
+today, so a faint seam there was *expected* and would not have been a finding —
+it was not seen either, which is a slightly stronger result than the README
+currently claims and is worth knowing before craters land.
+
+**What the pass does not cover.** Two limits, stated rather than glossed. It is
+one observer on one machine at one lighting angle, so it is an observation and
+not a measurement — that is inherent to the criterion and is why the spike plan
+asks for a description. And the black-flicker finding below was seen in the same
+session; it is not a seam, but it is in the same subsystem, and a reader
+concluding "the tile renderer is clean" from this row would be going further
+than the row goes.
 
 ## Results
 
@@ -316,8 +328,50 @@ session  10m 50s
 
 ### Notes on what was seen
 
-**C2 — not recorded.** Awaiting a specific description. The template below is
-what to fill in; it is blank, and a blank template is not a measurement.
+**C2 — recorded, and passing.** See the filled block further down, and the
+finding immediately below, which is deliberately kept out of the pass.
+
+#### Open finding — tiles flicker black while zooming
+
+Seen during the C2 session on build `2aac354`. Not reproduced to a rule: it is
+occasional and correlated with zooming rather than with any particular depth or
+face. **Not a seam**, so C2's wording is not affected; recorded here because the
+alternative is that it lives only in a chat log.
+
+It cannot affect a hash. The tile data is generated in a worker and hashed
+before it is ever drawn, and everything downstream of `buildTileColours` is
+presentation. So this is a renderer bug or a mesh-lifecycle bug, and it is
+bounded to those.
+
+Three hypotheses, cheapest first, and each is falsifiable without much work:
+
+1. **A skirt caught face-on.** The most likely, and it fits "while zooming"
+   exactly. A skirt is a wall of duplicated edge vertices pushed inward; it is
+   near-radial, so it is barely lit and renders almost black — the README says
+   so under "Skirts and seams". `lod/neighbours.ts` reselects which of the
+   sixteen index buffers a tile uses whenever a neighbour's depth changes, which
+   is precisely what a zoom causes. If a tile is briefly drawn with skirts on
+   all four edges while the camera is close enough to see the wall, that is a
+   black flash. **Check:** force the all-edges index buffer and see whether the
+   artefact becomes constant.
+2. **A frame drawn before the colour buffer is written.** `buildTileColours`
+   fills per-vertex colours; a mesh added to the scene one frame before that
+   completes would draw with a zeroed colour attribute, which is black.
+   **Check:** does the artefact survive setting the pool's default colour to
+   magenta? If the flash turns magenta, it is an unpopulated buffer, not a
+   skirt.
+3. **Mesh-pool reuse.** A pooled mesh reattached with stale geometry for a
+   frame. Same test as 2 discriminates it — magenta says buffer, black says
+   geometry.
+
+Hypothesis 2's check is the one to run first: it is one line, and it splits the
+three cleanly.
+
+**Why this matters more than it looks.** Craters are the highest-frequency
+signal this project will ever draw, and WP12's apron changes the same mesh path
+this artefact lives in. Diagnosing it *now*, against flat-shaded Phase 0
+geometry, is the same argument that put C2 before WP10 — afterwards it is
+ambiguous between the skirt, the apron and a crater band.
 
 *(Free text. C2 lives here, and so does anything the panel cannot say — a
 hitch that felt wrong but did not trip the 1 s flag, a tile that arrived
@@ -362,26 +416,28 @@ for that pair, and the pair is the first thing anyone debugging it will want.
 #### C2 — fill this in
 
 ```
-Build (commit):        ____________
-Machine / browser:     ____________          (same laptop as the blocks above?)
-Fixture:               ____________
-Exaggeration:          ____________          (1 unless there is a reason)
+Build (commit):        2aac354
+Machine / browser:     same                  (same laptop as the blocks above?)
+Fixture:               size8-earthlike
+Exaggeration:          1                     (1 unless there is a reason)
 
 LOD boundaries inspected (depth pairs):
-                       ____________
+                       1/2 2/3 3/4 4/5 5/6 6/7
 
 Sun angle at inspection:
-                       ____________          (near terminator / sub-solar / other)
+                       90 to the right          (near terminator / sub-solar / other)
 
-Cube-face edges — seam visible?      yes / no
-   distinguishable from LOD seams?   yes / no / did not compare
-   how it was told apart:            ____________
+Cube-face edges — seam visible?      no
+   distinguishable from LOD seams?   no
+   how it was told apart:            can't see any seams
 
-Face interior — seam at any LOD boundary?   yes / no
+Face interior — seam at any LOD boundary?   no
    if yes, depth pair(s):            ____________
    description:                      ____________
 
-Verdict:               PASS / FAIL / still not measured
+Verdict:               PASS
+
+Note: I cannot see any seams, although occasionally while zooming tiles flicker black
 ```
 
 Two answers that are both fine to record: "no seam at any of depths 4/5, 5/6,
