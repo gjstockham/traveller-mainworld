@@ -30,6 +30,81 @@ above is the copy that is, and the README repeats it.
 
 ---
 
+## 0.2.0-alpha.3 — a size-frequency distribution with no wall in it (WP10)
+
+Flying `alpha.2` produced a second visual finding — *not enough large craters* —
+and this time the model could be checked against reality rather than argued
+about. Enumerating every crater the generator places over a whole Luna-sized
+sphere and comparing against the real Moon found a **cliff at exactly the tier
+boundary**:
+
+| D ≥ | before | real Luna | |
+|---|---:|---:|---|
+| 50 km | 1 595 | ~830 | 1.9× |
+| **70 km** | **23** | **~423** | **0.05×** |
+| 100 km | 7 | ~207 | 0.03× |
+| largest | 605 km | SPA ~2 500 km | |
+
+A factor of seventy across a factor of 1.4 in diameter is not a distribution.
+The cause: **tier 2 was a density and tier 1 was a count.** Tier 2's population
+falls out of the lattice cell size; tier 1 was the literal number 24. They met
+at `LARGEST_BAND_RADIUS` in *size* and nowhere at all in *density*, so everything
+above 70 km on a Luna-sized world was 24 objects.
+
+(Real lunar figures anchor on Head et al. 2010's LOLA survey — 5 185 craters
+≥ 20 km — extrapolated on a cumulative slope of −2. That slope is about right
+over 20–100 km and steepens above, so the comparison is generous to us at the
+large end.)
+
+- **`MAX_BASINS` is now derived, not chosen.** For `p(r) ∝ r⁻³` the population
+  above a band's top is a third of the band's own, and a band's population is one
+  candidate per shell cell. That gives 1 623 rather than 24, and the ladder is
+  one curve:
+
+  | D ≥ | after | real Luna | |
+  |---|---:|---:|---|
+  | 20 km | 19 618 | 5 185 | 3.8× |
+  | 70 km | 1 598 | ~423 | 3.8× |
+  | 300 km | 82 | ~23 | 3.6× |
+
+  **The ratio is flat to within 5% across three decades of diameter** — the shape
+  now matches the Moon's and only the normalisation is high. That is a single
+  dial (`CANDIDATES_PER_CELL`, currently 3); it is left where it is because the
+  small-crater density is what was reported as working, and 3.8× a *global*
+  lunar count is not unreasonable for a surface whose `densityScale = 1.0` means
+  "Luna's highlands", which are denser than the global average. Say the word and
+  it comes down.
+
+  Still missing: a South Pole–Aitken. The largest basin generated is 1 029 km, an
+  Orientale/Imbrium-class feature. SPA is ~2 500 km on a 3 474 km body and is a
+  singular event rather than a draw from a distribution, so it will not fall out
+  of a power law and would have to be placed deliberately.
+
+- **`BasinCull`, and why 1 623 basins is affordable.** A loop over every basin at
+  every sample would have been the most expensive thing in the generator. Which
+  basins can reach a region is a property of the region, so it is answered once —
+  and the cull is a *superset* filter, never an exact set, which is what keeps
+  plan §5.3 satisfied: a basin it keeps but which cannot reach a given sample is
+  dropped by the same exact early-out as everything else. Culling tightly,
+  loosely, or not at all gives bit-identical results, asserted directly, because
+  that is the property WP13 will rely on when it culls by row band.
+
+  It is rebuilt **per row of the apron grid**, not per tile. Per tile is enough
+  almost everywhere, but a depth-0 tile is a whole cube face and a large fraction
+  of the world's basins genuinely reach it — culling against the whole face saved
+  nothing and a 129² root tile cost 130 ms on its own. A row is a thin slab.
+
+- **Cost**, same conditions as before. 65² runs 21–32 ms; 129² runs 72–115 ms.
+  Both are a few milliseconds worse than `alpha.2` — the basin population grew by
+  a factor of 68 and the row cull costs one pass over the basin list per row —
+  and the deep end still crosses the budget at 129². Unchanged conclusion: 65²
+  has the headroom, 129² does not, and that is WP15's to close with open
+  question 1.
+
+- One more test was asserting the pre-WP10 bound that elevation stays inside
+  `terrainAmplitudeM`, and passed until basins became numerous enough to reach
+  the tile it looked at. Same fix as the two in `alpha.2`.
+
 ## 0.2.0-alpha.2 — craters that are visible from orbit (WP10)
 
 The first flight of `0.2.0-alpha.1` found the band gate wrong in the way that

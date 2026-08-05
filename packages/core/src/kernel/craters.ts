@@ -6,8 +6,10 @@
  * - **Tier 1, global basins** (bucket b). The largest impacts, placed once per
  *   world at load. A basin can span several tiles and more than one cube face,
  *   so a per-tile cell scheme at that scale would need cells bigger than a face
- *   and the addressing stops meaning anything. The count is capped in the tens,
- *   so every sample can test every basin in a fixed, bounded loop.
+ *   and the addressing stops meaning anything — they get explicit uniform
+ *   placement instead. How many is *derived* from where tier 2 stops, so the
+ *   size-frequency distribution is one curve rather than two; see
+ *   {@link MAX_BASINS} for what it looked like when it was not.
  * - **Tier 2, per-tile size bands** (bucket a). Geometric bands, each covering
  *   crater radii in `[r, 2r)`, evaluated as a pure function of position.
  *
@@ -88,8 +90,16 @@ const QUARTER_TURN = 1.5707963267948966;
  *
  * 2% of the radius is a 70 km crater on a Luna-sized body and a 256 km one on
  * an Earth-sized body. Above this the field is tier 1 — {@link BASIN_MIN_RADIUS}
- * picks up exactly here, so the size-frequency distribution is continuous
- * across the tier split rather than having a gap or an overlap at the join.
+ * picks up exactly here, and {@link MAX_BASINS} continues the same power law, so
+ * the size-frequency distribution is continuous across the tier split in *count*
+ * as well as in size. Meeting in size alone is what it did first, and it left a
+ * factor-of-seventy cliff at exactly this radius.
+ *
+ * It is also the ceiling on what the lattice is asked to place. Cell size scales
+ * with the band, so a band this size already has only about twenty cells across
+ * the sphere; another octave up would be eleven, and the density variation open
+ * question 3 warns about would start to read as lattice structure in features
+ * large enough to notice it. Above here, explicit placement.
  */
 export const LARGEST_BAND_RADIUS = 0.02;
 
@@ -358,13 +368,41 @@ export function craterParams(
 // --- tier 1: global basins ---------------------------------------------------
 
 /**
- * Hard cap on basins per world.
+ * Basins per world at full density — **derived from the band ladder, not
+ * chosen**, so that the size-frequency distribution is continuous across the
+ * tier boundary.
  *
- * Small enough that every sample can test every basin in a bounded loop, which
- * is what makes tier 1 a bucket-(b) global pass rather than something needing
- * spatial addressing at a scale where addressing stops working.
+ * It used to be 24, and that was the single worst number in this file. Tier 2 is
+ * a *density* — its count falls out of the lattice cell size — while tier 1 was
+ * a *count*, and the two met at `LARGEST_BAND_RADIUS` with nothing joining them.
+ * Enumerated over a whole Luna-sized sphere, the result had a wall in it:
+ *
+ * | D ≥ | generated | real Luna | |
+ * |---|---:|---:|---|
+ * | 50 km | 1 595 | ~830 | 1.9× |
+ * | **70 km** | **23** | **~423** | **0.05×** |
+ * | 100 km | 7 | ~207 | 0.03× |
+ *
+ * A factor of seventy across a factor of 1.4 in diameter is not a distribution.
+ * Everything above 70 km — the craters that give a body its face — was 24
+ * objects.
+ *
+ * The count below continues the ladder instead. For `p(r) ∝ r⁻³` the number in a
+ * band `[a, 2a]` is `¾·N(≥a)` and `N(≥2a) = N(≥a)/4`, so `N(≥2a)` is a third of
+ * the band's own population; the band's population is one candidate per shell
+ * cell, and the shell holds about `4π/c²` cells.
+ *
+ * (Real lunar counts here are anchored on Head et al. 2010's LOLA survey —
+ * 5 185 craters ≥ 20 km — and extrapolated on a cumulative slope of −2, which is
+ * about right over 20–100 km and is known to steepen above that. So the
+ * comparison is, if anything, generous to us at the large end.)
  */
-export const MAX_BASINS = 24;
+export const MAX_BASINS = (() => {
+  const cell = CELL_RATIO * LARGEST_BAND_RADIUS;
+  // 8 × (π/2) is 4π: the unit sphere's area, in cells of side `cell`.
+  const shellCells = (8 * QUARTER_TURN) / (cell * cell);
+  return Math.round((shellCells * CANDIDATES_PER_CELL) / 3);
+})();
 
 /** Smallest basin radius: exactly where tier 2 stops. */
 export const BASIN_MIN_RADIUS = LARGEST_BAND_RADIUS;
@@ -401,10 +439,14 @@ export function buildBasins(
   seedHi: number,
   seedLo: number,
   densityScale: number,
+  scratch?: BasinField,
 ): BasinField {
   const seed = craterLayerSeed(seedHi, seedLo, LAYER_BASINS);
-  const data = new Float64Array(MAX_BASINS * BASIN_STRIDE);
-  const ages = new Int32Array(MAX_BASINS);
+  // Reused when offered. The field is a few tens of kilobytes and is rebuilt per
+  // tile, so allocating it fresh each time would be the largest single source of
+  // garbage in the generator.
+  const data = scratch?.data ?? new Float64Array(MAX_BASINS * BASIN_STRIDE);
+  const ages = scratch?.ages ?? new Int32Array(MAX_BASINS);
   const accept = clamp(densityScale, 0, 1);
 
   // `1 − (min/max)²`, the span of the inverse size CDF below. Named because the
@@ -781,13 +823,69 @@ function basinScale(radius: number): number {
 const BASIN_SCALE_BUCKETS = 5;
 
 /**
+ * The basins that can reach one region — the tier-1 counterpart of
+ * {@link CraterCells}.
+ *
+ * Once the basin count follows the ladder rather than a fixed 24, a loop over
+ * every basin at every sample is the most expensive thing in the generator. Only
+ * a handful can reach any given tile, and which ones is a property of the tile
+ * rather than of the sample, so it is answered once.
+ *
+ * **The cull is a superset, never an exact set**, and that is what keeps plan
+ * §5.3 satisfied: a basin it keeps but which does not reach a particular sample
+ * is dropped by the same exact early-out as everything else, contributing no
+ * arithmetic. So a caller culling against a *looser* region gets bit-identical
+ * results to one culling tightly, or to one not culling at all — which
+ * `craters.test.ts` asserts directly, because it is the property the export path
+ * will rely on when it culls by row band.
+ */
+export class BasinCull {
+  /** Indices into the basin field, in field order. */
+  readonly keep = new Int32Array(MAX_BASINS);
+  count = 0;
+
+  /**
+   * Keep every basin whose support can reach the axis-aligned box.
+   *
+   * Distance to the box rather than to a bounding sphere: the samples lie inside
+   * it, so anything that can reach a sample can reach the box, and a box is both
+   * tighter than a sphere for a tile patch and cheaper to test.
+   */
+  build(
+    basins: BasinField,
+    minX: number,
+    minY: number,
+    minZ: number,
+    maxX: number,
+    maxY: number,
+    maxZ: number,
+  ): void {
+    let kept = 0;
+    for (let i = 0; i < basins.count; i++) {
+      const at = i * BASIN_STRIDE;
+      const dx = Math.max(minX - basins.data[at]!, 0, basins.data[at]! - maxX);
+      const dy = Math.max(minY - basins.data[at + 1]!, 0, basins.data[at + 1]! - maxY);
+      const dz = Math.max(minZ - basins.data[at + 2]!, 0, basins.data[at + 2]! - maxZ);
+      const reach = SUPPORT_RATIO * basins.data[at + 3]!;
+      if (dx * dx + dy * dy + dz * dz < reach * reach) {
+        this.keep[kept] = i;
+        kept++;
+      }
+    }
+    this.count = kept;
+  }
+}
+
+/**
  * Collect the tier-1 basins affecting one sample.
  *
- * A fixed loop over every basin in the world, which is what the cap on
- * {@link MAX_BASINS} buys. Basins enter the same candidate list as band craters
- * and take the same canonical order, so a basin and a small crater interleave by
+ * Basins enter the same candidate list as band craters and take the same
+ * canonical order, so a basin and a small crater interleave by scale and then by
  * age rather than by tier — without that, a young crater inside an old basin
  * would be composited first and erased by it.
+ *
+ * @param cull Optional pre-filter. Omitting it tests every basin in the world,
+ *             which is correct and slow; see {@link BasinCull}.
  */
 export function collectBasins(
   into: CraterCandidates,
@@ -795,8 +893,11 @@ export function collectBasins(
   py: number,
   pz: number,
   basins: BasinField,
+  cull?: BasinCull,
 ): void {
-  for (let i = 0; i < basins.count; i++) {
+  const total = cull === undefined ? basins.count : cull.count;
+  for (let k = 0; k < total; k++) {
+    const i = cull === undefined ? k : cull.keep[k]!;
     const at = i * BASIN_STRIDE;
     addIfInSupport(
       into,
@@ -1211,9 +1312,10 @@ export function craterReliefAt(
   params: CraterParams,
   seed: number,
   scratch: CraterCandidates,
+  cull?: BasinCull,
 ): number {
   scratch.reset();
-  collectBasins(scratch, px, py, pz, basins);
+  collectBasins(scratch, px, py, pz, basins, cull);
   collectFromLattice(scratch, px, py, pz, bandsForDepth(depth), params.densityScale, seed);
   return compositeCraters(scratch, params);
 }

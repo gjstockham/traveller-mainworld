@@ -26,6 +26,7 @@
 import { faceUvToDirection } from './cubesphere.js';
 import {
   type BasinField,
+  BasinCull,
   CraterCandidates,
   CraterCells,
   LAYER_CRATER_BANDS,
@@ -199,6 +200,29 @@ export const LAYER_TERRAIN = 0;
  */
 const CELLS = new CraterCells();
 const CANDIDATES = new CraterCandidates();
+const BASIN_CULL = new BasinCull();
+/**
+ * Storage for the basin field, reused across tiles.
+ *
+ * The field is rebuilt from the tile's own inputs on every call — it is not a
+ * cache, and a tile generated between two others cannot change it. Only the
+ * arrays are reused, because at full density the field is tens of kilobytes and
+ * allocating it per tile would be the generator's largest source of garbage.
+ */
+let BASIN_STORE: BasinField | undefined;
+/**
+ * Per-row bounding boxes of the apron grid, six numbers each.
+ *
+ * The basin cull is rebuilt per *row* rather than per tile. Per tile is enough
+ * almost everywhere — a tile a few degrees across is reached by a handful of
+ * basins — but a depth-0 tile is a whole cube face, and a large fraction of the
+ * world's basins genuinely reach it. Culling against the whole face saved
+ * nothing and a 129² root tile cost 130 ms, over the R13 budget on its own. A
+ * row is a thin slab, so the cull bites there too, and re-running it per row
+ * costs one pass over the basin list per row — a couple of milliseconds against
+ * the fifty it saves.
+ */
+let ROW_BOXES = new Float64Array(0);
 
 /**
  * Quadtree depth from a tile's extent.
@@ -260,13 +284,14 @@ export function generateTile(input: TileGenInput, out: TileGenOutput): void {
   // The bucket-(b) global pass. Rebuilt per tile rather than cached per world:
   // it is a few hundred integer hashes, and a cache here would be a second
   // place for the tile path and the export path to disagree.
-  const basins: BasinField = buildBasins(input.seedHi, input.seedLo, craters.densityScale);
+  BASIN_STORE = buildBasins(input.seedHi, input.seedLo, craters.densityScale, BASIN_STORE);
+  const basins = BASIN_STORE;
   const bandSeed = craterLayerSeed(input.seedHi, input.seedLo, LAYER_CRATER_BANDS);
 
   const lo = -APRON_RING;
   const hi = n + APRON_RING;
 
-  // --- pass 1: directions, base terrain, bounding box ---
+  // --- pass 1: directions, base terrain, bounding boxes ---
   let minX = Infinity;
   let minY = Infinity;
   let minZ = Infinity;
@@ -274,8 +299,20 @@ export function generateTile(input: TileGenInput, out: TileGenOutput): void {
   let maxY = -Infinity;
   let maxZ = -Infinity;
 
+  if (ROW_BOXES.length < stride * 6) {
+    ROW_BOXES = new Float64Array(stride * 6);
+  }
+
   for (let j = lo; j <= hi; j++) {
     const v = v0 + (j / n) * size;
+    const box = (j + APRON_RING) * 6;
+    ROW_BOXES[box] = Infinity;
+    ROW_BOXES[box + 1] = Infinity;
+    ROW_BOXES[box + 2] = Infinity;
+    ROW_BOXES[box + 3] = -Infinity;
+    ROW_BOXES[box + 4] = -Infinity;
+    ROW_BOXES[box + 5] = -Infinity;
+
     for (let i = lo; i <= hi; i++) {
       const u = u0 + (i / n) * size;
       const d = faceUvToDirection(face, u, v);
@@ -286,6 +323,13 @@ export function generateTile(input: TileGenInput, out: TileGenOutput): void {
       if (d.x > maxX) maxX = d.x;
       if (d.y > maxY) maxY = d.y;
       if (d.z > maxZ) maxZ = d.z;
+
+      if (d.x < ROW_BOXES[box]!) ROW_BOXES[box] = d.x;
+      if (d.y < ROW_BOXES[box + 1]!) ROW_BOXES[box + 1] = d.y;
+      if (d.z < ROW_BOXES[box + 2]!) ROW_BOXES[box + 2] = d.z;
+      if (d.x > ROW_BOXES[box + 3]!) ROW_BOXES[box + 3] = d.x;
+      if (d.y > ROW_BOXES[box + 4]!) ROW_BOXES[box + 4] = d.y;
+      if (d.z > ROW_BOXES[box + 5]!) ROW_BOXES[box + 5] = d.z;
 
       out.apronElevation[apronIndex(n, i, j)] = fbm3(d.x, d.y, d.z, terrainSeed, fbm) * scale;
 
@@ -303,12 +347,18 @@ export function generateTile(input: TileGenInput, out: TileGenOutput): void {
 
   for (let j = lo; j <= hi; j++) {
     const v = v0 + (j / n) * size;
+    const box = (j + APRON_RING) * 6;
+    BASIN_CULL.build(
+      basins,
+      ROW_BOXES[box]!, ROW_BOXES[box + 1]!, ROW_BOXES[box + 2]!,
+      ROW_BOXES[box + 3]!, ROW_BOXES[box + 4]!, ROW_BOXES[box + 5]!,
+    );
     for (let i = lo; i <= hi; i++) {
       const u = u0 + (i / n) * size;
       const d = faceUvToDirection(face, u, v);
 
       CANDIDATES.reset();
-      collectBasins(CANDIDATES, d.x, d.y, d.z, basins);
+      collectBasins(CANDIDATES, d.x, d.y, d.z, basins, BASIN_CULL);
       CELLS.collect(CANDIDATES, d.x, d.y, d.z);
 
       const k = apronIndex(n, i, j);
@@ -362,6 +412,7 @@ export function sampleElevation(
   input: PointSampleInput,
   basins: BasinField,
   scratch: CraterCandidates,
+  cull?: BasinCull,
 ): number {
   const terrainSeed = (input.seedLo ^ Math.imul(input.seedHi, 0x9e3779b1)) | 0;
   const norm = fbmNormalisation(input.fbm);
@@ -377,7 +428,7 @@ export function sampleElevation(
   const bandSeed = craterLayerSeed(input.seedHi, input.seedLo, LAYER_CRATER_BANDS);
 
   scratch.reset();
-  collectBasins(scratch, x, y, z, basins);
+  collectBasins(scratch, x, y, z, basins, cull);
   collectFromLattice(scratch, x, y, z, bandsForDepth(depth), craters.densityScale, bandSeed);
   return base + compositeCraters(scratch, craters);
 }

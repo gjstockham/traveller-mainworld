@@ -14,6 +14,7 @@
 import {
   APRON_RING,
   ALWAYS_ON_BANDS,
+  BasinCull,
   BAND_SAMPLES_ACROSS,
   lodStepBound,
   CANDIDATES_PER_CELL,
@@ -700,6 +701,70 @@ describe('global basins', () => {
   it('thins out with density, and vanishes at zero', () => {
     expect(buildBasins(1, 2, 0).count).toBe(0);
     expect(buildBasins(1, 2, 0.25).count).toBeLessThan(buildBasins(1, 2, 1).count);
+  });
+
+  it('CULLS WITHOUT CHANGING THE ANSWER, however loose the box', () => {
+    // The property the whole cull rests on, and the one WP13 will rely on when
+    // it culls by row band rather than by tile. A cull is a *superset* filter:
+    // a basin it keeps but which cannot reach a sample is dropped by the same
+    // exact early-out as everything else, so the composite is identical whether
+    // the box was tight, loose, or absent.
+    //
+    // The tile path already culls per row and the point path does not, so the
+    // bit-exact equality test at the top of this file is the large-scale version
+    // of this. This is the direct one, and it fails if the cull ever starts
+    // dropping something that could contribute.
+    const world = FIXTURES[2]!.world;
+    const params = craterParams(
+      world.spec.radiusKm,
+      world.spec.craters.densityScale,
+      world.spec.craters.transitionDiameterKm,
+      world.spec.craters.regolithMaturity,
+    );
+    const basins = buildBasins(world.seedHi, world.seedLo, world.spec.craters.densityScale);
+    const tight = new BasinCull();
+    const loose = new BasinCull();
+    const list = new CraterCandidates();
+
+    const relief = (px: number, py: number, pz: number, cull?: BasinCull): number => {
+      list.reset();
+      collectBasins(list, px, py, pz, basins, cull);
+      return compositeCraters(list, params);
+    };
+
+    let culledAnything = false;
+    for (let s = 0; s < 60; s++) {
+      const a = 1 + s * 0.31;
+      const b = -2 + s * 0.17;
+      const c = 0.7 - s * 0.09;
+      const inv = 1 / Math.sqrt(a * a + b * b + c * c);
+      const x = a * inv;
+      const y = b * inv;
+      const z = c * inv;
+
+      // A box that is exactly the point, and one padded far beyond it.
+      tight.build(basins, x, y, z, x, y, z);
+      loose.build(basins, x - 0.2, y - 0.2, z - 0.2, x + 0.2, y + 0.2, z + 0.2);
+      if (tight.count < basins.count) culledAnything = true;
+
+      const none = relief(x, y, z);
+      expect(relief(x, y, z, tight), `probe ${String(s)} tight`).toBe(none);
+      expect(relief(x, y, z, loose), `probe ${String(s)} loose`).toBe(none);
+    }
+    // Otherwise the equalities above would be comparing the full list to itself.
+    expect(culledAnything, 'the cull kept every basin, so it proved nothing').toBe(true);
+  });
+
+  it('continues the band ladder rather than being a chosen number', () => {
+    // The defect this replaced: tier 2 was a density and tier 1 was a fixed 24,
+    // so the size-frequency distribution fell by a factor of seventy across a
+    // factor of 1.4 in diameter — everything above 70 km on a Luna-sized world
+    // was 24 objects. For `p(r) ∝ r⁻³` the population above a band's top is a
+    // third of the band's own, and that is what the count is derived from.
+    const shellCells = (8 * QUARTER_TURN) / (bandCellSize(0) * bandCellSize(0));
+    expect(MAX_BASINS).toBe(Math.round((shellCells * CANDIDATES_PER_CELL) / 3));
+    // Sanity: the ladder is continuous, so this is hundreds, not tens.
+    expect(MAX_BASINS).toBeGreaterThan(500);
   });
 
   it('is the same field for the same world, every time', () => {

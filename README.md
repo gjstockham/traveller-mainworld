@@ -7,7 +7,7 @@ UPP parser, the `cepheus-1` interpretation layer and hierarchical crater fields
 have landed; the input UI, regolith palette, export package and share URLs have
 not. See [the PRD](docs/requirements/worldgen-prd.md) for scope.
 
-The generator version is a **prerelease** (`0.2.0-alpha.2`) for the duration of
+The generator version is a **prerelease** (`0.2.0-alpha.3`) for the duration of
 Phase 1 — see [`CHANGELOG.md`](CHANGELOG.md) for why, and for what moves between
 re-pins.
 
@@ -70,8 +70,8 @@ wrong in ways the table did not show — see `bench/test/harness.test.ts`.
 
 `bench/src/craters.ts` was a **cost model** standing in for a crater pass that
 did not exist. It exists now (WP10), and the model's 0.700 ms per 129² tile is
-not what the real pass costs: warmed medians in Node run 18–30 ms at 65² and
-66–110 ms at 129², against a ≈100 ms budget. Those are the shape of a number
+not what the real pass costs: warmed medians in Node run 21–32 ms at 65² and
+72–115 ms at 129², against a ≈100 ms budget. Those are the shape of a number
 rather than a measurement — wrong machine, not through this harness, no
 percentiles — and replacing the model with a real one is **WP15's** job, along
 with whether ADR-0001's R4 performance trigger fires and Phase 1 open question 1

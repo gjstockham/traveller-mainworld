@@ -159,10 +159,20 @@ describe('runTileJob', () => {
       REQUEST,
       allocateTileOutput(N),
     );
-    const limit = WORLD.spec.terrainAmplitudeM;
+    // The bound is `terrainAmplitudeM` plus the deepest basin the crater pass
+    // can dig, not `terrainAmplitudeM` alone. That field bounded the whole
+    // surface until WP10 and now bounds only the fBm half of it — a basin's
+    // depth comes from its diameter and the world's gravity. What matters here
+    // is that the real kernel stays nowhere near the stand-in's scale, and it
+    // does by two orders of magnitude.
+    const limit =
+      WORLD.spec.terrainAmplitudeM + 0.4 * 0.3 * WORLD.spec.radiusKm * 1000;
     expect(response.minElevation).toBeGreaterThan(-limit);
     expect(response.maxElevation).toBeLessThan(limit);
     expect(response.maxElevation).toBeGreaterThan(response.minElevation);
+    // The stand-in's smallest non-zero value is 1000 m at vertex 1 and its
+    // largest is 80 000 m; the real kernel's range must not be mistakable.
+    expect(Math.abs(response.maxElevation)).toBeLessThan(20_000);
   });
 });
 

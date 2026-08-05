@@ -32,7 +32,7 @@
  * hashing what is being built, forfeiting the composition-bug catching it exists
  * for.
  */
-export const GEN_VERSION = '0.2.0-alpha.2';
+export const GEN_VERSION = '0.2.0-alpha.3';
 
 // Kernel — the whitelisted zone. See README for what may and may not go in here.
 export * from './kernel/ops.js';
