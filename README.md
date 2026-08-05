@@ -20,6 +20,7 @@ re-pins.
 | `packages/core/src/input` | UPP parsing and seed handling. No rules knowledge. |
 | `packages/core/src/ruleset` | `(UPP, ruleset) → PhysicalWorldSpec`. **All** rules knowledge, and the only OGL content. |
 | `packages/core/src/palette` | Surface scalars → RGB. **Outside** the whitelisted zone, and outside every hash. |
+| `packages/export` | Projected 2D maps, rendered from generation data. **Outside** the whitelisted zone. |
 | `packages/viewer` | Three.js cube-sphere viewer (Vite). |
 | `packages/golden` | Golden-hash battery, fixture worlds, manifests and runners. |
 | `crates/kernel-wasm` | Rust→wasm32 twin of the kernel. Must hash identically to it. |
@@ -276,6 +277,64 @@ and max 6.0–15.9° at the same depths. So it is the same size of step confined
 twelve edges rather than spread over the whole quadtree, on edges that are
 already skirted unconditionally for the same missing rotation table.
 
+## Exporting a map
+
+`packages/export` renders projected 2D maps from generation data rather than from
+screenshots (PRD R23–R26), so an export is seam-free and independent of the
+viewport. For each output pixel: projection → lat/lon → 3D direction →
+`sampleSurface` at a chosen detail depth → `core/palette` → RGB.
+
+In the viewer it is the **Export a map** section under the info panel —
+collapsed, because an export is an occasional act and not part of the U1 loop.
+From a terminal:
+
+```sh
+pnpm --filter @traveller-mainworld/export build
+node packages/export/dist/cli.js --upp F20076C-F --seed 42 \
+  --size 4096x2048 --projection equirectangular --out map.png
+```
+
+`--help` lists the rest. The CLI exists partly for convenience and mostly so the
+PRD §9.4 acceptance artefact can be re-produced without clicking, and so the
+point path can be timed on real work.
+
+**Everything that decides what an export *is* runs in Node, and is tested there.**
+The projection maths, the detail depth, the palette application, the graticule,
+the title block, the PNG container, the pool's scheduling and its failure
+handling — about two thousand lines. What is left for a browser is the module
+worker, the structured clone and the download, which is why `ExportServer` and
+`renderWithPool` take their platform as a parameter rather than naming `Worker`.
+Browser measurements do not happen under WSL2, so a check that only exists inside
+a `Worker` is a check nobody on this machine can run.
+
+**The poles are a value, not a limit**, and that is decided in two independent
+halves. Equirectangular samples **pixel centres**, so no row is ever at ±90° and
+there is no singularity to arrange arithmetic around — this is area registration,
+the convention every equirectangular raster uses, and it puts the poles on the
+outer edges of the first and last rows where a 180°-tall image should. And
+`directionFromGeographic` returns the pole axis **exactly** for `|lat| ≥ π/2`,
+for the caller that reaches it anyway: `Math.cos(π/2)` is 6.12e-17 rather than
+zero, so without the snap a polar row would be a ring of points 6e-17 apart, each
+landing in a different crater lattice cell.
+
+**The detail depth currently changes nothing, deliberately.** Plan §8 asks for
+the tile depth whose sample spacing matches the export's texel spacing, and the
+formula is there and gives depth 4 at 4096×2048. But WP11 made the albedo field
+depth-invariant on purpose — a colour that changed with depth would draw a line
+along every LOD boundary in the viewer — so an albedo-only export is
+byte-identical at every depth, and paying for the extra crater bands costs 27% of
+the render. `surfaceSampleDepth` samples the surface at the cheapest depth that
+gives the same answer, with that equality **asserted** rather than assumed, in
+the same shape as `BasinCull`'s superset argument. The full depth is still
+computed and printed on the map, because it becomes load-bearing the moment
+anything derived from *elevation* is exported.
+
+**There is no hillshading**, and an unshaded albedo map of a cratered airless
+world therefore reads flatter than the viewer — on Luna most of what the eye
+reads as a crater is shadow. Deferred deliberately;
+[docs/evidence/wp13-export.md](docs/evidence/wp13-export.md) §5 has the decision
+and both sides of it.
+
 ## The two golden artefacts
 
 `packages/golden` commits two records of what the generator produces, and every
@@ -461,9 +520,26 @@ refuses any import that leaves the kernel directory.
 
 Palette tuning therefore costs no version bump and no manifest regeneration,
 which is correct: it changes how a world is *displayed*, not what it *is*. The
-same module is what WP13's exporter will colour a map through, so PRD §9.4 — the
+same module is what `packages/export` colours a map through, so PRD §9.4 — the
 exported map matches the 3D view — is a property of there being one function
 rather than a coincidence of two staying in step.
+
+### And where it ends again: `packages/export`
+
+The same boundary, one package further out. A projection decides **which
+directions to sample**; the sampling itself goes through the kernel and comes
+back bit-identical whichever route asked for it. If `Math.exp` differs in the
+last bit between two browsers, the exporter picks a sample a picometre away from
+the one the other browser picked — which is a different question from whether the
+world is the same world, and the answer to that one is still yes.
+
+So `Math.log`, `Math.tan`, `Math.atan` and `Math.sin` are unremarkable in
+`packages/export`, and **an approximation must not be added to
+`kernel/approx.ts` on that package's account.** That is the expensive version of
+the mistake: it puts a new approximation, a new accuracy fixture and a new WASM
+parity obligation into the hashed zone to satisfy a rule that never applied out
+there. `projection/mercator.ts` and `geography.ts` carry the paragraph at the
+point of use.
 
 ## The WASM twin
 

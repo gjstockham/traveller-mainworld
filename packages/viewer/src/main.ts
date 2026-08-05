@@ -42,6 +42,7 @@ import { type SunDirection, sunFrom } from './render/sun.js';
 import { type CameraPose, cameraFrom, checkGenVersion, rulesetIdFrom } from './share/url.js';
 import { TileStore } from './stream/tileStore.js';
 import { ControlPanel } from './ui/controlPanel.js';
+import { ExportPanel } from './ui/exportPanel.js';
 import { DEFAULT_SEED, DEFAULT_UPP, type WorldChoice, chooseWorld, uppWorld } from './world/choice.js';
 
 /** Planet radius in scene units. Everything else is expressed relative to this. */
@@ -177,6 +178,13 @@ function main(): void {
     exaggeration,
   });
 
+  // Its own section under the info panel rather than more rows inside it: an
+  // export is an occasional act — session prep, a wiki page — and not part of
+  // the U1 loop, so it should not compete with the UPP field for attention.
+  const exportPanel = new ExportPanel(
+    app.querySelector('[data-panel="controls"]') as HTMLElement,
+  );
+
   /** Tear down the current session and build one for `choice`. */
   function openSession(choice: WorldChoice): void {
     session?.dispose();
@@ -229,6 +237,7 @@ function main(): void {
 
     orbit.reframe(INITIAL_ALTITUDE_KM / spec.radiusKm);
     panel.show(choice);
+    exportPanel.show(choice);
     document.title = `Traveller Mainworld — ${choice.label}`;
 
     // Ignore the startup burst when reporting the worst frame, and take the
@@ -418,6 +427,7 @@ function main(): void {
     controls.dispose();
     session?.dispose();
     panel.dispose();
+    exportPanel.dispose();
     renderer.dispose();
   });
 }

@@ -25,19 +25,18 @@
  * `default world`; a block from this build names the UPP instead, which is what
  * makes the two distinguishable rather than silently comparable.
  *
- * ## Reduced fidelity is data, not a string
+ * ## Reduced fidelity moved to `core` in WP13
  *
- * PRD §7 requires every valid UPP (Size 1+) to load at every phase, with codes
- * whose subsystem is not built yet rendering at reduced fidelity behind a badge.
- * {@link FidelityReport} is that badge's content: which positions are not
- * honoured, what the ruleset calls them, and what is actually being drawn
- * instead. Returned as structure rather than as a sentence so the panel decides
- * the wording and the test can assert the *set of positions* — a badge asserted
- * by regex on prose stops testing anything the first time the prose is edited.
+ * `FidelityReport` and `fidelityFor` were this file's. They are now
+ * `core/ruleset/fidelity.ts` and re-exported below, because WP13 gave the scope
+ * fence a second consumer: an exported map's title block has to say the same
+ * thing the viewer's badge says, and a scope fence stated twice is a scope fence
+ * that moves once. Nothing about the behaviour changed — `worldChoice.test.ts`
+ * still asserts the same set of positions.
  *
- * **Size 0 is not a fidelity note.** It is a refusal, because PRD §3 makes belts
- * a permanent non-goal rather than a pending phase, and a badge saying "not yet"
- * about something that will never come is the worst of both.
+ * **Size 0 is still refused here**, not there. It is a refusal rather than a
+ * fidelity note, because PRD §3 makes belts a permanent non-goal rather than a
+ * pending phase, and product scope is the app's job.
  *
  * Selection is a pure function of the query string so it can be tested without
  * a browser. An unknown id is an error naming every valid one, not a silent
@@ -46,11 +45,12 @@
  */
 import {
   FIXTURES,
+  FULL_FIDELITY,
+  type FidelityReport,
   type ParsedUpp,
   type Ruleset,
-  UPP_POSITIONS,
   type World,
-  describeUpp,
+  fidelityFor,
   hashSeedString,
   interpret,
   isUppError,
@@ -59,6 +59,13 @@ import {
 } from '@traveller-mainworld/core';
 
 import { rulesetIdFrom } from '../share/url.js';
+
+// Re-exported so the viewer's own modules keep importing them from here — the
+// panel, the tests and `main.ts` all name this module for what a world *is*, and
+// making them reach into `core/ruleset` for one of the five fields on
+// `WorldChoice` would be a worse boundary than the one line below.
+export { fidelityFor };
+export type { FidelityNote, FidelityReport } from '@traveller-mainworld/core';
 
 /**
  * The world an empty query string resolves to: Luna, as the Traveller wiki
@@ -73,28 +80,6 @@ export const DEFAULT_UPP = 'F20076C-F';
 
 /** The seed used when none is given. Kept from Phase 0 so old links still match. */
 export const DEFAULT_SEED = '42';
-
-/** One UPP position this phase does not honour. */
-export interface FidelityNote {
-  /** The ruleset's display name for the position — "Atmosphere". */
-  readonly position: string;
-  /** The character as it appears in the canonical spelling. */
-  readonly code: string;
-  /** The ruleset's own short name for that code. */
-  readonly label: string;
-  /** What is drawn instead, and which phase changes it. */
-  readonly rendered: string;
-}
-
-export interface FidelityReport {
-  readonly reduced: boolean;
-  readonly notes: readonly FidelityNote[];
-}
-
-/** The half of a {@link FidelityNote} that comes straight from the ruleset. */
-type DescribedFields = Pick<FidelityNote, 'position' | 'code' | 'label'>;
-
-const FULL_FIDELITY: FidelityReport = Object.freeze({ reduced: false, notes: [] });
 
 export interface WorldChoice {
   /** Shown in the title bar and the diagnostics overlay. */
@@ -124,57 +109,6 @@ export interface WorldChoice {
 /** Every fixture id, in manifest order — for error messages and the picker. */
 export function fixtureIds(): string[] {
   return FIXTURES.map((f) => f.id);
-}
-
-/**
- * Which positions Phase 1 cannot honour, and what it draws instead.
- *
- * Phase 1 is airless rocky worlds: Atmo 0–1, Hydro 0 (PRD §7). Everything else
- * still renders — that is the requirement — as the rocky world underneath.
- *
- * Population, Government, Law Level and Tech Level are deliberately **not**
- * here. They are not physical and the interpreter never reads them, so there is
- * nothing about the planet they could be said to be degrading; they arrive in
- * Phase 6 as settlement placement, which is an addition rather than a fidelity
- * debt. A badge listing them would be listing four positions the renderer is
- * not wrong about.
- */
-export function fidelityFor(upp: ParsedUpp, ruleset: Ruleset): FidelityReport {
-  const described = describeUpp(upp, ruleset);
-
-  // Keyed off `UPP_POSITIONS` rather than off a display name, for the reason
-  // `describe.ts` gives for doing the same: two copies of "Hydrographics"
-  // drift, and the copy that drifts is the one the badge is read from.
-  const at = (key: 'atmosphere' | 'hydrographics'): DescribedFields => {
-    const index = UPP_POSITIONS.find((p) => p.key === key)?.position;
-    const found = described.positions.find((p) => p.position === index);
-    if (found === undefined) {
-      throw new Error(`ruleset ${ruleset.id} described no ${key} position`);
-    }
-    return { position: found.name, code: found.code, label: found.label };
-  };
-
-  const notes: FidelityNote[] = [];
-
-  if (upp.atmosphere > 1) {
-    notes.push({
-      ...at('atmosphere'),
-      rendered:
-        'drawn as a vacuum — sky colour, haze and scattering are Phase 2, and the surface ' +
-        'tinting an atmosphere implies is Phase 4',
-    });
-  }
-
-  if (upp.hydrographics > 0) {
-    notes.push({
-      ...at('hydrographics'),
-      rendered:
-        'drawn dry — the sea-level solve against terrain (R8), coastlines and ice caps are ' +
-        'Phase 2',
-    });
-  }
-
-  return notes.length === 0 ? FULL_FIDELITY : { reduced: true, notes };
 }
 
 /**

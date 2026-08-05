@@ -36,6 +36,12 @@ export { CEPHEUS_1, CEPHEUS_1_ID } from './cepheus1/index.js';
 export { interpret, interpretText } from './interpret.js';
 export { describeUpp, missingProse } from './describe.js';
 export type { DescribedPosition, UppDescription } from './describe.js';
+// Reduced fidelity (PRD §7). Here rather than in the viewer since WP13: the
+// scope fence is something the viewer's badge and the exporter's title block
+// both have to agree about, and a scope fence stated twice is one that moves
+// once.
+export { FULL_FIDELITY, fidelityFor, fidelitySummary } from './fidelity.js';
+export type { FidelityNote, FidelityReport } from './fidelity.js';
 export { leafPaths, serialiseSpec, specHash } from './serialise.js';
 export { deepFreeze, deepFrozenViolations } from './freeze.js';
 

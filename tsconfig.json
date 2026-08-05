@@ -3,6 +3,7 @@
   "files": [],
   "references": [
     { "path": "./packages/core" },
+    { "path": "./packages/export" },
     { "path": "./packages/golden" },
     { "path": "./packages/viewer" },
     { "path": "./bench" }

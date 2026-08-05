@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    // The CLI runs under Node. Everything it imports stays platform-neutral —
+    // the same modules render a map inside a browser worker (R26), and only
+    // `cli.ts` may touch `node:` anything.
+    "types": ["node"],
+    // `CompressionStream` is a web platform global, present in Node >= 18 and in
+    // every target browser. It is the one dependency the PNG encoder has, and
+    // it is the reason the encoder needs no zlib import on either platform.
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../core" }]
+}

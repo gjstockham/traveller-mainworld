@@ -30,6 +30,80 @@ above is the copy that is, and the README repeats it.
 
 ---
 
+## Unreleased — WP13: `packages/export`
+
+**No identity moved, and an export work package that moved one would be a bug.**
+An exporter that reaches a hash is an exporter that has started generating rather
+than reading. The one change inside `packages/core` is `ruleset/fidelity.ts`,
+which moved out of the viewer and computes a caption; it has no arithmetic in it.
+All four golden artefacts verify unchanged against the committed manifests.
+
+- **A third package** (`packages/export`), rendering projected 2D maps from
+  generation data rather than from screenshots (R23–R26). For each output pixel:
+  projection → lat/lon → 3D direction → `sampleSurface` at a chosen detail depth
+  → `worldPalette` → RGB → PNG. Equirectangular and Mercator, behind an
+  inverse-only projection interface; graticule at 15°/30° and a title block;
+  worker pool by row bands with progress and cancel; a hand-written PNG encoder
+  over `CompressionStream('deflate')`, which is the RFC 1950 stream `IDAT` holds.
+
+- **A pixel agrees exactly with the viewer's tile data.** Asserted against the
+  viewer's own `buildTileColours` output, `Float32`-exact, over four fixture
+  worlds × three tiles. Most of the agreement is *inherited* — WP11 already
+  asserted `sampleSurface` byte-identical to `generateTile`, `bandsForDepth` is
+  the one shared gate and `core/palette` the one shared colour map — so this
+  tests the two layers that are new: the projection maths and the application of
+  the palette.
+
+- **Seam-free across all twelve cube edges, by construction.** The export never
+  touches a face parameterisation; it point-samples by 3D direction. Measured on
+  the 4096×2048 acceptance artefact, adjacent-pixel differences at the four cube
+  edges the equator crosses are 3, 7, 7 and 8 sRGB bytes, against a 99th
+  percentile of 18 and a maximum of 41 for the row as a whole.
+
+- **The poles are a value, not a limit — decided in two independent halves.**
+  Equirectangular samples **pixel centres**, so no row is ever at ±90° and the
+  singularity is unreachable rather than special-cased; and
+  `directionFromGeographic` returns the pole axis **exactly** for `|lat| ≥ π/2`,
+  for the caller that reaches it anyway. Without the second, `Math.cos(π/2)` is
+  6.12e-17 rather than zero and a polar row would be a ring of points 6e-17
+  apart, each landing in a different crater lattice cell. The handoff asked for
+  "the top row is one colour, exactly"; measured over six world/seed pairs it is
+  one colour on four of twelve polar rows and spans up to 34 of 255 on the rest,
+  where a ray boundary genuinely crosses the 1.3 km circle. So what is asserted
+  is the true property: a polar row varies less than a third as much as an
+  equatorial one and is **continuous**.
+
+- **The detail depth changes nothing in the picture, and that is the finding.**
+  Plan §8's formula is built and gives its own two values (depth 4 at 4096×2048,
+  depth 3 at 2048×1024), written against `referenceSpacing` so that Phase 1 open
+  question 1 is not baked in. But WP11 made the albedo field depth-invariant on
+  purpose — `regolith.ts` has a line commented "the depth-independence filter",
+  so that a colour changing with depth could not draw a line along every LOD
+  boundary — and plan §8 predates that choice. Measured on `X400000-0` at
+  256×128, depths 0 through 8 give byte-identical images and cost 632 ms to
+  1578 ms to do it: **27% of the render at depth 4 is candidates nothing reads**.
+  The full depth is still computed, printed and overridable, because it becomes
+  load-bearing the moment anything elevation-derived is exported; the surface is
+  sampled at `surfaceSampleDepth` instead, with the equality asserted rather than
+  assumed, in the same shape as `BasinCull`'s superset argument.
+
+- **`fidelityFor` moved from `viewer/src/world/choice.ts` to
+  `core/src/ruleset/fidelity.ts`.** WP13 gave the Phase 1 scope fence a second
+  consumer, and a scope fence stated twice is a scope fence that moves once. The
+  viewer re-exports it and its behaviour is unchanged.
+
+- **Hillshading was considered and deferred**, and it is in the open register
+  rather than left for WP16 to find. An unshaded albedo map of a cratered airless
+  world reads flatter than the viewer, because on Luna most of what the eye reads
+  as a crater is shadow. `docs/evidence/wp13-export.md` §5 has the decision.
+
+- **Twenty mutations run against the new tests; two escaped and both were the
+  test's fault.** A filter-heuristic test asserted a file-size bound that deflate
+  satisfied either way, and an edge-wrapping test probed column 0 when an overrun
+  of `k` columns lands at column `k`. Both rewritten to discriminate, both re-run,
+  both caught. Two further mutations are recorded as *expected* non-catches so
+  the count is not misread. `docs/evidence/wp13-export.md` §6.
+
 ## Unreleased — WP12: the viewer
 
 **No identity moved, and a viewer work package that moved one would be a bug.**
