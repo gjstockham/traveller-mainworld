@@ -2,7 +2,14 @@
 
 A browser-based tool that turns a Universal Planetary Profile (UPP) plus a seed into a fully explorable 3D planet. Paste `C867A69-8`, get a world you can orbit, zoom into, and export as a projected 2D map.
 
-**Status:** Phase 0 (foundations). No product features yet — see [the PRD](docs/requirements/worldgen-prd.md) for scope and [the Phase 0 spike plan](docs/requirements/phase0-spike-plan.md) for what this phase has to prove.
+**Status:** Phase 1 (airless rocky worlds), in progress. Phase 0 is complete. The
+UPP parser, the `cepheus-1` interpretation layer and hierarchical crater fields
+have landed; the input UI, regolith palette, export package and share URLs have
+not. See [the PRD](docs/requirements/worldgen-prd.md) for scope.
+
+The generator version is a **prerelease** (`0.2.0-alpha.1`) for the duration of
+Phase 1 — see [`CHANGELOG.md`](CHANGELOG.md) for why, and for what moves between
+re-pins.
 
 ## Layout
 
@@ -61,9 +68,14 @@ as dead code, median and p95 rather than a mean, and a control run subtracted
 from the transfer figures. Three numbers in the first draft of the results were
 wrong in ways the table did not show — see `bench/test/harness.test.ts`.
 
-`bench/src/craters.ts` is a **cost model**, not shipping code: Phase 0 has no
-craters, but the budget is for a Phase-1 tile, so the pass is modelled at
-representative density outside `packages/core` where it cannot touch a hash.
+`bench/src/craters.ts` was a **cost model** standing in for a crater pass that
+did not exist. It exists now (WP10), and the model's 0.700 ms per 129² tile is
+not what the real pass costs: an unoptimised run in Node measures 24–84 ms
+depending on depth, against a ≈100 ms budget. That is the shape of a number
+rather than a measurement — wrong machine, no warm-up, no percentiles — and
+replacing the model with a measurement is **WP15's** job, along with whether
+ADR-0001's R4 performance trigger fires. Until then the model stays where it is
+and should not be quoted as a Phase 1 figure.
 
 The viewer takes `?seed=<text>` to change world, `?debug=1` to preserve the WebGL
 drawing buffer so pixels can be read back, and `?fixture=<id>` to fly one of the
@@ -113,12 +125,13 @@ flicker black while zooming — and splits its three hypotheses in one flight: a
 mesh reattached before it was refilled; a flash that stays **black** is geometry,
 almost certainly a skirt wall caught face-on. Presentation only.
 
-What this exposes is that almost everything currently visible on these worlds
-was displacement. At true scale they are smooth spheres with four hard-edged
-albedo bands, because the things that give a real body its face are not built
-yet: craters (Phase 1), albedo that tracks geology rather than elevation
-(Phase 4), and shading from the true elevation gradient at full resolution.
-Photorealism is those, not a multiplier.
+What this exposes is that almost everything visible on these worlds *was*
+displacement. At true scale they were smooth spheres with four hard-edged albedo
+bands, because the things that give a real body its face were not built yet.
+Craters are the first of them and have landed; what is still missing is albedo
+that tracks geology rather than elevation (Phase 4), and shading from the true
+elevation gradient at full resolution — smooth per-vertex normals, which is what
+the apron below exists for (WP12). Photorealism is those, not a multiplier.
 
 ## Skirts and seams
 
@@ -143,6 +156,26 @@ unconditionally, because cross-face adjacency needs a rotation table the viewer
 does not yet carry. Twelve cube edges are affected, and a faint seam is visible
 along them at some angles.
 
+**Craters made the crack about a hundred times bigger, and the skirt had to grow
+with it.** A tile carries one crater band its parent could not resolve, so where
+two LOD levels meet they disagree at a shared vertex by that band's crater
+depth. `skirtDepthFor` used to size the wall from the fBm's statistical
+self-similarity — relief across a cell shrinks with the cell — and that reasoning
+does not transfer: a crater's depth is set by the crater, not by a fraction of
+the world's relief. The wall now carries a third term from `lodStepBound` in
+`core`, which is zero wherever the band gate does not move and is asserted
+against the real field rather than argued for in a comment. It settles at around
+5% of a tile edge, and that figure is scale-invariant — making it smaller means
+gating bands in later, not tuning the skirt.
+
+**The apron.** Tile generation also produces an `(n+3)²` elevation grid, one ring
+beyond the tile on each side. It is not drawn: WP12 needs it to compute smooth
+per-vertex normals, because a normal at an edge vertex needs elevation from
+outside the tile and without it every tile boundary gets a normal discontinuity
+that reads as a wireframe grid over the whole planet. Within a face the ring is
+the neighbour's own elevation bit-for-bit; across a cube-face boundary it is an
+extrapolation, the same twelve edges named above.
+
 ## The two golden artefacts
 
 `packages/golden` commits two records of what the generator produces, and every
@@ -166,9 +199,11 @@ catches that.
 
 Running both on every browser and OS is what turns "should be identical" into
 "demonstrably is". CI fails on any mismatch. (`pnpm golden:parity`, the TS↔WASM
-comparison, still runs the battery only — its `tile.composite` case covers tile
-generation through both kernels, and the archived twin is not maintained against
-the fixture set.)
+comparison, runs the battery only, and **from WP10 it skips `tile.composite`** —
+the archived twin does not implement the crater pass, so that one case
+legitimately differs. It is named in the report every time it is skipped. The
+consequence is that composition is no longer checked by a second implementation,
+only against this kernel's own past output; see the note in `parity.ts`.)
 
 **The water-mask hashes are hashes of a constant.** Phase 0 worlds are airless,
 so the water mask is all zeros for every fixture and its hash is identical

@@ -32,6 +32,22 @@ drift from the TypeScript kernel eventually; a failure here means "the twin is
 stale", not necessarily "the kernel is wrong". Which of the two it is has to be
 read from the diff, and that is the cost the ADR accepted.
 
+## What it has already drifted on
+
+**WP10 (2026-08-05) put a crater pass in the TypeScript kernel and not here**, so
+the twin's `generate_tile` produces base fBm terrain, writes no apron, and no
+longer agrees on a whole tile. The `tile.composite` battery case is therefore
+**excluded from the parity comparison** — see `UNIMPLEMENTED_IN_TWIN` in
+`packages/golden/src/parity.ts`, which names it in every passing report. The
+other twenty cases are kernel functions, none of which moved, and they still
+compare bit-for-bit over the full battery.
+
+That exclusion is the drift being priced rather than hidden, and it costs
+something specific: composition — turning kernel functions into a tile — is no
+longer checked by a second implementation. If ADR-0001's trigger ever fires and
+this crate is revived, catching up means porting `craters.ts` and the apron loop
+before `tile.composite` can come back into the comparison.
+
 ## The three rules still apply
 
 They hold while the crate exists, archived or not, and `pnpm lint:wasm` runs on

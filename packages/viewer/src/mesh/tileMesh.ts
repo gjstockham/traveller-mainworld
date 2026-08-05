@@ -14,6 +14,7 @@
  * Acceptable for Phase 0/1 flat shading; revisit when Phase 2 adds water edges
  * and scattering.
  */
+import { lodStepBound } from '@traveller-mainworld/core';
 
 /**
  * Vertices in a tile mesh: the `(n+1)²` grid, plus **two** skirt rings per edge.
@@ -150,21 +151,39 @@ export interface MeshParams {
  * which is exactly the artefact skirts are supposed to prevent.
  *
  * The crack at an LOD boundary is the gap between a coarse tile's straight
- * edge and the finer surface beside it, so it is bounded by what varies across
- * **one cell of the coarser neighbour** — not by the world's total relief.
- * Two terms, both scaled to that cell:
+ * edge and the finer surface beside it. Three terms, and the third is the one
+ * WP10 added:
  *
- *  - *geometric*: the sagitta of the cell chord against the sphere.
- *  - *terrain*: relief across the cell. With `gain = 0.5, lacunarity = 2` the
- *    fBm is statistically self-similar with H ≈ 1, so relief scales roughly
- *    linearly with arc length — a cell spanning 1/k of the sphere shows about
- *    1/k of the total relief.
+ *  - *geometric*: the sagitta of the coarser neighbour's cell chord against the
+ *    sphere.
+ *  - *terrain*: fBm relief across that cell. With `gain = 0.5, lacunarity = 2`
+ *    the field is statistically self-similar with H ≈ 1, so relief scales
+ *    roughly linearly with arc length — a cell spanning 1/k of the sphere shows
+ *    about 1/k of the total relief.
+ *  - *craters*: the elevation step between the two LOD levels themselves. A
+ *    tile at depth `d` carries at most one crater band its parent does not, and
+ *    the two therefore disagree at a shared vertex by up to `lodStepBound(d)` —
+ *    which is zero wherever the band gate does not move, and `craters.test.ts`
+ *    asserts against the real field rather than leaving it as an argument.
+ *
+ * **That third term dominates the other two by about two orders of magnitude**,
+ * and it is not a refinement of the second: fBm relief across a cell shrinks
+ * with the cell, but a crater band's relief is set by the crater's own depth,
+ * which is a fixed multiple of the sample spacing rather than a fraction of the
+ * world's total relief. Before WP10 there were no craters and the estimate was
+ * right; with them the skirt was around a hundred times too short, and the
+ * cracks it stopped hiding would have been read as a seam.
  *
  * An earlier version used `amplitudeM · 0.5` flat, which does not shrink with
  * depth at all: at depth 8 that gave a skirt ten times longer than the tile was
- * wide, and it showed as dark seams across the globe.
+ * wide, and it showed as dark seams across the globe. The crater term shrinks
+ * with depth like the others, so that failure does not return.
  *
  * @param n Grid resolution, so the cell size is known rather than assumed.
+ * @param radiusKm The world's real radius. Needed because the crater step is a
+ *        fraction of the planetary radius rather than of the world's relief, and
+ *        recovering it from `elevationScale` would be wrong whenever the
+ *        `?exaggeration=` override is in use.
  */
 export function skirtDepthFor(
   depth: number,
@@ -172,6 +191,7 @@ export function skirtDepthFor(
   amplitudeM: number,
   elevationScale: number,
   n: number,
+  radiusKm: number,
 ): number {
   // Angular size of a tile edge: a quarter-turn at depth 0, halving each level.
   const tileArc = (Math.PI / 2) / Math.pow(2, depth);
@@ -183,9 +203,15 @@ export function skirtDepthFor(
   // any particular cell can exceed its expectation.
   const terrain = amplitudeM * elevationScale * (cellArc / Math.PI) * 4;
 
+  // The crater step is already a worst case rather than an expectation, so it
+  // takes no safety factor of its own. It is expressed in metres of elevation,
+  // like `amplitudeM`, so it goes through the same scale.
+  const craterStepM = lodStepBound(depth) * radiusKm * 1000;
+  const craters = craterStepM * elevationScale;
+
   // Floor keeps the wall from degenerating to zero at extreme depth, where
   // float precision in the position buffer starts to matter.
-  return sagitta + terrain + radius * 1e-6;
+  return sagitta + terrain + craters + radius * 1e-6;
 }
 
 /**

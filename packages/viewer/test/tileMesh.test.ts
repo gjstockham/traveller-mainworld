@@ -4,6 +4,7 @@ import {
   TsTileGenerator,
   type World,
   interpretText,
+  lodStepBound,
   makeTileId,
 } from '@traveller-mainworld/core';
 import { describe, expect, it } from 'vitest';
@@ -40,7 +41,7 @@ function build(face: number, n: number, depth = 0, path = 0): BuiltMesh {
     n,
     radius: RADIUS,
     elevationScale: ELEV_SCALE,
-    skirtDepth: skirtDepthFor(depth, RADIUS, WORLD.spec.terrainAmplitudeM, ELEV_SCALE, n),
+    skirtDepth: skirtDepthFor(depth, RADIUS, WORLD.spec.terrainAmplitudeM, ELEV_SCALE, n, WORLD.spec.radiusKm),
   }, positions);
   return { positions, indices: buildTileIndices(n), gridVerts: (n + 1) * (n + 1) };
 }
@@ -209,32 +210,78 @@ describe('positions', () => {
 });
 
 describe('skirtDepthFor', () => {
-  it('shrinks with depth', () => {
+  const TRUE_SCALE = 1 / (1737 * 1000);
+
+  it('shrinks with depth once the crater bands are on', () => {
+    // Not from depth 0: the first band is gated in at depth 3, so a depth-3 tile
+    // is the first that can disagree with its parent about craters and the wall
+    // steps up to cover it. Below that there is no crater crack to hide and the
+    // skirt is the Phase 0 geometric-plus-fBm estimate. From 3 upward every
+    // level halves the band's crater size, so it shrinks monotonically again.
     let prev = Infinity;
-    for (let d = 0; d <= 12; d++) {
-      const s = skirtDepthFor(d, 1, 6000, ELEV_SCALE, 64);
-      expect(s).toBeLessThan(prev);
+    for (let d = 3; d <= 12; d++) {
+      const s = skirtDepthFor(d, 1, 6000, ELEV_SCALE, 64, 1737);
+      expect(s, `depth ${d}`).toBeLessThan(prev);
       expect(s).toBeGreaterThan(0);
       prev = s;
     }
+    expect(
+      skirtDepthFor(3, 1, 6000, ELEV_SCALE, 64, 1737),
+      'the first crater band did not lengthen the skirt',
+    ).toBeGreaterThan(skirtDepthFor(2, 1, 6000, ELEV_SCALE, 64, 1737));
   });
 
   it('STAYS PROPORTIONATE TO THE TILE at every depth', () => {
     // The regression that mattered: a flat `amplitude * 0.5` terrain term does
     // not shrink with depth, so by depth 8 the skirt was ten times longer than
     // the tile was wide and showed as dark seams across the globe.
+    //
+    // The ceiling is 6% rather than the crater-free era's 5%, and the number is
+    // not arbitrary: the crack at a boundary is the newly-gated band's crater
+    // depth, `1.25 · 0.4 · rMax`, and the gate ties `rMax` to about
+    // `BAND_SAMPLES_ACROSS` reference spacings — so the ratio settles near
+    // `0.008 · BAND_SAMPLES_ACROSS`, about 5%, and is scale-invariant — the band
+    // ladder and the depth ladder do not divide evenly, so it wanders either
+    // side. Past depth 12 the `radius · 1e-6` numerical floor is a further
+    // percent on its own, which is what that floor is for. Making the ratio
+    // smaller means gating bands in later, not tuning the skirt.
     for (let d = 0; d <= 14; d++) {
       const tileEdge = (Math.PI / 2) / Math.pow(2, d);
-      const ratio = skirtDepthFor(d, 1, 6000, ELEV_SCALE, 64) / tileEdge;
-      expect(ratio, `depth ${d} skirt/tile ratio`).toBeGreaterThan(0.001);
-      expect(ratio, `depth ${d} skirt/tile ratio`).toBeLessThan(0.05);
+      const ratio = skirtDepthFor(d, 1, 6000, TRUE_SCALE, 64, 1737) / tileEdge;
+      // The floor only catches a skirt that has collapsed to nothing. At true
+      // scale and above the first crater band, a depth-0 tile's crack really is
+      // this small — the old floor was calibrated against a 25× exaggeration.
+      expect(ratio, `depth ${d} skirt/tile ratio`).toBeGreaterThan(1e-4);
+      expect(ratio, `depth ${d} skirt/tile ratio`).toBeLessThan(0.07);
+    }
+  });
+
+  it('grows with the exaggeration override, because the crack does too', () => {
+    // `?exaggeration=` multiplies displayed relief, so it multiplies the crack
+    // between two LOD levels as well. A skirt that ignored it would open every
+    // boundary on the one view whose whole purpose is looking at terrain
+    // closely.
+    expect(skirtDepthFor(5, 1, 6000, ELEV_SCALE, 64, 1737)).toBeGreaterThan(
+      skirtDepthFor(5, 1, 6000, TRUE_SCALE, 64, 1737),
+    );
+  });
+
+  it('covers the elevation step the kernel says two LOD levels can differ by', () => {
+    // The load-bearing claim, and the reason the crater term exists at all. If
+    // `lodStepBound` moves and the skirt does not, cracks open at every LOD ring
+    // and read as a seam — which is exactly what C2 is looking for.
+    for (let d = 3; d <= 12; d++) {
+      const crackScene = lodStepBound(d) * 1737 * 1000 * TRUE_SCALE;
+      expect(skirtDepthFor(d, 1, 6000, TRUE_SCALE, 64, 1737), `depth ${d}`).toBeGreaterThan(
+        crackScene,
+      );
     }
   });
 
   it('scales down as the grid gets finer', () => {
     // More cells per tile means smaller cracks to hide.
-    expect(skirtDepthFor(4, 1, 6000, ELEV_SCALE, 128)).toBeLessThan(
-      skirtDepthFor(4, 1, 6000, ELEV_SCALE, 32),
+    expect(skirtDepthFor(4, 1, 6000, ELEV_SCALE, 128, 1737)).toBeLessThan(
+      skirtDepthFor(4, 1, 6000, ELEV_SCALE, 32, 1737),
     );
   });
 });

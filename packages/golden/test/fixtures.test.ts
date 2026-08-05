@@ -10,7 +10,10 @@ import {
   type TileGenerator,
   TsTileGenerator,
   type World,
+  canonicalBytes,
   leafPaths,
+  makeTileId,
+  sha256Hex,
   tileBounds,
   tileDepth,
   tileFace,
@@ -187,17 +190,17 @@ describe('the fixture-spec hash', () => {
  * not cover, each with the phase that will change that.
  *
  * WP9 grew the spec to PRD R5's full field set — atmosphere, hydrographics,
- * derived hints, crater parameters — while `serialiseFixtureSpecs` still names
- * the three things Phase 0 generation reads. That is correct *today*: none of
- * these reaches `generateTile`, so hashing them would move the fixture-spec
- * hash for inputs no generator consumes.
+ * derived hints, crater parameters — while `serialiseFixtureSpecs` named only
+ * the three things Phase 0 generation read. **WP10 moved the three `craters.*`
+ * entries out of this list and into the serialiser**, because the crater pass
+ * reads them: a field that reaches generation without reaching this hash is a
+ * fixture set that cannot tell two different worlds apart.
  *
- * It stops being correct the moment one of them does. WP10 reads
- * `craters.*`; Phase 2 reads `hydrographicCoverage` and `atmosphere.*`. A
- * field that reaches generation without reaching this hash is a fixture set
- * that cannot tell two different worlds apart — so the list below is an
- * obligation, not a note, and the test under it fails on any spec field that
- * is neither serialised nor listed here.
+ * What is left is genuinely unread. Phase 2 will consume `hydrographicCoverage`
+ * and `atmosphere.*`; Phase 4 the hints. So the list is an obligation, not a
+ * note, and it is now checked twice: one test fails on any spec field that is
+ * neither serialised nor listed, and another perturbs everything listed and
+ * fails if the elevation moves.
  */
 const NOT_YET_GENERATED: Readonly<Record<string, string>> = {
   surfaceGravityG: 'stored only; WP10 uses it via craters.transitionDiameterKm',
@@ -208,9 +211,6 @@ const NOT_YET_GENERATED: Readonly<Record<string, string>> = {
   'hints.temperatureBand': 'Phase 4 (climate)',
   'hints.iceLikelihood': 'Phase 4 (climate)',
   'hints.terrainRoughness': 'derived from radiusKm and terrainAmplitudeM, both hashed',
-  'craters.densityScale': 'WP10',
-  'craters.transitionDiameterKm': 'WP10',
-  'craters.regolithMaturity': 'WP10, WP11',
 };
 
 describe('the fixture-spec hash covers the whole spec', () => {
@@ -243,7 +243,95 @@ describe('the fixture-spec hash covers the whole spec', () => {
     const leaves = new Set(leafPaths(spec));
     expect(Object.keys(NOT_YET_GENERATED).filter((path) => !leaves.has(path))).toEqual([]);
   });
+
+  /**
+   * The guard WP9 could not write, and WP10 can.
+   *
+   * `NOT_YET_GENERATED` is a claim: these fields do not reach generation, so the
+   * fixture-spec hash does not have to cover them. Until WP10 nothing checked
+   * it, and nothing *could* — every excused field had no effect on generation,
+   * so a perturbation test would have passed vacuously over all eleven of them
+   * and proved nothing about any.
+   *
+   * The moment a crater parameter reached `generateTile` it stopped being
+   * vacuous, because a field that is excused *and* consumed now turns this red
+   * and names itself. Without it, two fixtures with different crater settings
+   * would produce different elevation hashes and the fixture-spec hash could not
+   * say why — a fixture set that cannot tell two worlds apart.
+   */
+  it('EXCUSES ONLY FIELDS THAT REALLY DO NOT REACH GENERATION', () => {
+    const n = 16;
+    const tileId = makeTileId(2, 5, 0b1101100111);
+    const world = FIXTURES[3]!.world;
+    const baseline = elevationHash(world, tileId, n);
+
+    for (const path of Object.keys(NOT_YET_GENERATED)) {
+      const perturbed = perturb(world, path);
+      expect(
+        elevationHash(perturbed, tileId, n),
+        `'${path}' is listed as not reaching generation, but perturbing it changed the ` +
+          'elevation hash. Move it into serialiseFixtureSpecs — that is a fixture-spec ' +
+          'change under the change protocol, with a changelog entry naming the new hash.',
+      ).toBe(baseline);
+    }
+  });
+
+  it('would notice a consumed field left in the excuse list', () => {
+    // The check on the check. Every field above is excused *and* unread, so the
+    // loop passes either way unless a perturbation can actually move the hash —
+    // this proves one can.
+    const n = 16;
+    const tileId = makeTileId(2, 5, 0b1101100111);
+    const world = FIXTURES[3]!.world;
+    expect(elevationHash(perturb(world, 'craters.densityScale'), tileId, n)).not.toBe(
+      elevationHash(world, tileId, n),
+    );
+  });
 });
+
+/** SHA-256 of one tile's elevation buffer, through the shipping generator. */
+function elevationHash(world: World, tileId: number, n: number): string {
+  const tile = tsGenerator().generate(tileId, world, n);
+  return sha256Hex(canonicalBytes(tile.elevation.subarray(0, (n + 1) * (n + 1))));
+}
+
+/**
+ * A copy of `world` with one leaf of its spec substantially moved.
+ *
+ * **Halved, not nudged by an ulp**, and the difference matters. A one-ulp step
+ * is the right perturbation for asking whether a *serialiser* reads a field —
+ * it is what `interpret.test.ts` uses, for the reason recorded there — but it is
+ * far too weak for asking whether a field reaches *generation*. Several of these
+ * are compared against a hash to decide something: `craters.densityScale` is the
+ * acceptance threshold for every crater candidate on the planet, and moving it
+ * by one ulp changes no decision anywhere, so the guard passed over it in
+ * silence on its first run. A field this test cannot move is a field this test
+ * cannot vouch for.
+ *
+ * Non-numeric leaves (the pressure band, the composition class) take a
+ * different valid value instead, since nudging a string is not a thing.
+ */
+function perturb(world: World, path: string): World {
+  const keys = path.split('.');
+  const clone = structuredClone(world.spec) as Record<string, unknown>;
+  let node: Record<string, unknown> = clone;
+  for (const key of keys.slice(0, -1)) {
+    node = node[key] as Record<string, unknown>;
+  }
+  const last = keys.at(-1)!;
+  const current = node[last];
+  node[last] =
+    typeof current === 'number'
+      ? // Zero has no half, and every numeric field here is a scale, a
+        // probability or a length, so 0.5 is in range for all of them.
+        current === 0
+        ? 0.5
+        : current * 0.5
+      : current === 'none'
+        ? 'trace'
+        : 'none';
+  return { ...world, spec: clone as unknown as World['spec'] };
+}
 
 describe('running fixtures', () => {
   it('reproduces the committed hashes for a full-size fixture', () => {

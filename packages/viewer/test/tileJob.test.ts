@@ -197,6 +197,27 @@ if (!HAVE_WASM) {
   );
 }
 
+/**
+ * A world with no craters at all.
+ *
+ * WP10 put a crater pass in the TypeScript kernel and not in the archived twin,
+ * so the two no longer agree on a Phase 1 world — and a comparison that simply
+ * dropped to "both produce plausible buffers" would stop being evidence of
+ * anything. Setting `densityScale` to zero removes every basin and every band
+ * candidate, so the TypeScript kernel's elevation is its base fBm field exactly,
+ * which is what the twin computes.
+ *
+ * The comparison therefore stays byte-exact over the arithmetic the twin still
+ * implements, and it is honest about which arithmetic that is. What is *not*
+ * covered any more is the crater pass, and nothing here should be read as
+ * saying otherwise — `pnpm check:parity` is the check ADR-0001 cites and it has
+ * the same gap, recorded in `CHANGELOG.md`.
+ */
+const CRATERLESS_WORLD: World = {
+  ...WORLD,
+  spec: { ...WORLD.spec, craters: { ...WORLD.spec.craters, densityScale: 0 } },
+};
+
 describe.skipIf(!HAVE_WASM)('the seam swaps for the real WASM twin', () => {
   it('produces byte-identical renderer buffers through the same job path', async () => {
     const kernel = await instantiateWasmKernel(wasmBytes()!);
@@ -210,8 +231,8 @@ describe.skipIf(!HAVE_WASM)('the seam swaps for the real WASM twin', () => {
     expect(tsGen.kind).toBe('typescript');
     expect(wasmGen.kind).toBe('wasm');
 
-    const ts = runTileJob(tsGen, WORLD, REQUEST, allocateTileOutput(N));
-    const wasm = runTileJob(wasmGen, WORLD, REQUEST, allocateTileOutput(N));
+    const ts = runTileJob(tsGen, CRATERLESS_WORLD, REQUEST, allocateTileOutput(N));
+    const wasm = runTileJob(wasmGen, CRATERLESS_WORLD, REQUEST, allocateTileOutput(N));
 
     expect(wasm.response.minElevation).toBe(ts.response.minElevation);
     expect(wasm.response.maxElevation).toBe(ts.response.maxElevation);
@@ -225,5 +246,25 @@ describe.skipIf(!HAVE_WASM)('the seam swaps for the real WASM twin', () => {
     for (let i = 0; i < ts.response.colours.length; i++) {
       expect(wasm.response.colours[i], `colour[${i}]`).toBe(ts.response.colours[i]);
     }
+  });
+
+  it('diverges from the TypeScript kernel once craters are on, as the ADR expects', () => {
+    // The check on the check. If the crater-free world above ever stopped being
+    // crater-free — a density clamp, a default, a basin that ignored the scale —
+    // the comparison would still pass and would silently be testing nothing.
+    // This asserts the gap it is written around is real.
+    const withCraters = runTileJob(
+      createTileGenerator(GEN),
+      WORLD,
+      REQUEST,
+      allocateTileOutput(N),
+    );
+    const without = runTileJob(
+      createTileGenerator(GEN),
+      CRATERLESS_WORLD,
+      REQUEST,
+      allocateTileOutput(N),
+    );
+    expect(withCraters.response.minElevation).not.toBe(without.response.minElevation);
   });
 });

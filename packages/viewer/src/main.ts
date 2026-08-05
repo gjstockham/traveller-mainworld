@@ -130,7 +130,14 @@ function main(): void {
     radius: RADIUS,
     elevationScale,
     skirtDepthFor: (depth) =>
-      skirtDepthFor(depth, RADIUS, world.spec.terrainAmplitudeM, elevationScale, TILE_N),
+      skirtDepthFor(
+        depth,
+        RADIUS,
+        world.spec.terrainAmplitudeM,
+        elevationScale,
+        TILE_N,
+        world.spec.radiusKm,
+      ),
   });
 
   let lodState = new Set<number>();

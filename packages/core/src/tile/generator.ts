@@ -67,13 +67,22 @@ export class TsTileGenerator implements TileGenerator {
         tileId,
         fbm: world.spec.fbm,
         amplitudeM: world.spec.terrainAmplitudeM,
+        radiusKm: world.spec.radiusKm,
+        craterDensityScale: world.spec.craters.densityScale,
+        craterTransitionDiameterKm: world.spec.craters.transitionDiameterKm,
+        regolithMaturity: world.spec.craters.regolithMaturity,
       },
       buffers,
     );
 
     // Cheap relative to generation, and the only thing standing between a NaN
     // and an unreproducible golden hash — NaN bit patterns are not portable.
+    //
+    // The apron is checked too even though it is not hashed: it feeds WP12's
+    // normals, and a NaN there would propagate into geometry rather than into a
+    // manifest, which is the harder of the two to trace back.
     assertClean(buffers.elevation, `tile ${tileId} elevation`);
+    assertClean(buffers.apronElevation, `tile ${tileId} apron`);
 
     return { ...buffers, tileId, genVersion: this.genVersion, n };
   }

@@ -24,6 +24,25 @@ every hash plus both overall digests.
 > evidence resting on it, exactly where they are. See the README, "Why two files
 > rather than more rows in one".
 
+> **Superseded by WP10 (2026-08-05), and the reason matters.** Generator version
+> is now `0.2.0-alpha.1`; the battery digest is `513f7af66fbd228c…`, the fixture
+> set `4f23f0304c09635f…` and the fixture digest `9131b09897abad9b…`. **Every
+> result recorded below still stands as a result** — each row names the build it
+> ran on — but none of them can be re-derived from the current tree, so none is
+> a *current* check of any engine.
+>
+> The paragraph above turns out to have been half right. It said a fixture edit
+> would leave the battery digest alone, and that held. What it did not anticipate
+> is a change that moves both: WP10's crater pass is kernel arithmetic *and* is
+> composed into `tile.composite`, so twenty of the twenty-one battery cases are
+> untouched and the twenty-first — and therefore the digest over all of them —
+> moved. The claim resting on this file is that identical arithmetic gives
+> identical bits on every engine, and nothing about that claim changed; what
+> changed is that the numbers naming it are stale.
+>
+> **These rows need re-running before Phase 1's exit evidence cites them**
+> (WP16). Filling M1 on a borrowed Mac is still outstanding either way.
+
 > **This file gates ADR-0001.** [ADR-0001](../adr/ADR-0001-generation-kernel.md)
 > selected the TypeScript kernel **provisionally**, because when it was written
 > only the three local Ubuntu cells had run and the three manual rows below were

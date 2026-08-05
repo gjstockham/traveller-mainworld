@@ -31,6 +31,30 @@ import {
 } from './battery.js';
 import type { KernelApi } from './kernelApi.js';
 
+/**
+ * Battery cases the archived twin does not implement, and so is not compared on.
+ *
+ * **This list is a cost, not a convenience.** ADR-0001 archived
+ * `crates/kernel-wasm` rather than maintaining it, and WP10 put a crater pass in
+ * the TypeScript kernel only — so `tile.composite`, which composes kernel
+ * functions into a whole tile, now legitimately differs. Comparing it anyway
+ * would turn `pnpm check:parity` permanently red and, worse, would train whoever
+ * saw it to ignore the one check that says whether two independent
+ * implementations agree.
+ *
+ * What is left is still the thing the ADR cites: every *kernel function* —
+ * approximations, hashes, the RNG, gradient noise, fBm, the cube-sphere mapping
+ * — compared bit-for-bit over the full battery. What is lost is composition
+ * coverage, which is real: a kernel function can be perfectly stable while the
+ * composition of them into a tile is not, and the golden fixture set is now the
+ * only thing checking that. It checks it against the TypeScript kernel's own
+ * past output rather than against a second implementation, which is a weaker
+ * claim, and it is the claim ADR-0001 accepted when it archived the crate.
+ *
+ * Adding a name here is a decision about evidence. It belongs in `CHANGELOG.md`.
+ */
+const UNIMPLEMENTED_IN_TWIN: ReadonlySet<string> = new Set(['tile.composite']);
+
 /** A disagreement between the two kernels. */
 export interface ParityMismatch {
   readonly kind: 'constant' | 'case';
@@ -164,6 +188,9 @@ export function compareKernels(
   const cases: ParityCase[] = [];
 
   for (const c of BATTERY) {
+    if (UNIMPLEMENTED_IN_TWIN.has(c.name)) {
+      continue;
+    }
     let tsResult: BatteryResult;
     let wasmResult: BatteryResult;
     try {
@@ -206,9 +233,13 @@ export function compareKernels(
 /** Human-readable parity report. */
 export function formatParityReport(report: ParityReport): string {
   if (report.mismatches.length === 0) {
+    const skipped = [...UNIMPLEMENTED_IN_TWIN].join(', ');
     return (
       `Kernel parity: all ${report.cases.length} battery cases and both shared constants ` +
-      'are bit-identical between the TypeScript and WASM kernels.'
+      'are bit-identical between the TypeScript and WASM kernels.' +
+      // Named, every time. A comparison that quietly covers less than it used to
+      // is worse than one that covers less and says so.
+      (skipped === '' ? '' : `\nNot compared (not implemented in the archived twin): ${skipped}.`)
     );
   }
   const lines = [

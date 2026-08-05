@@ -24,7 +24,7 @@ import {
 } from '@traveller-mainworld/core';
 import { describe, expect, it } from 'vitest';
 
-import { QUICK_BATTERY } from '../src/battery.js';
+import { BATTERY, QUICK_BATTERY } from '../src/battery.js';
 import { type KernelApi, tsKernelApi, wasmKernelApi } from '../src/kernelApi.js';
 import { compareKernels, formatParityReport } from '../src/parity.js';
 import { WASM_BUILD_HINT, loadWasmKernel, wasmArtefactExists } from '../src/wasmLoader.js';
@@ -115,6 +115,14 @@ describe.skipIf(!HAVE_WASM)('TypeScript kernel vs WASM twin', () => {
 
       expect(formatParityReport(report)).toMatch(/are bit-identical/);
       expect(report.mismatches).toEqual([]);
+
+      // The twin does not implement WP10's crater pass, so `tile.composite` is
+      // excluded. That exclusion has to be visible in the report and it has to
+      // be the *only* one — a comparison that quietly shrinks is how this file
+      // becomes a tick.
+      expect(formatParityReport(report)).toMatch(/Not compared.*tile\.composite/);
+      expect(report.cases.map((c) => c.name)).not.toContain('tile.composite');
+      expect(report.cases.length).toBe(BATTERY.length - 1);
     },
   );
 

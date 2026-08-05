@@ -360,6 +360,13 @@ export function serialiseFixtureSpecs(
       `fixture=${f.id}`,
       `  radiusKm=${String(spec.radiusKm)}`,
       `  terrainAmplitudeM=${String(spec.terrainAmplitudeM)}`,
+      // WP10: read by `generateTile`, so covered here from the commit that made
+      // them so. `fixtures.test.ts` perturbs every field the hash does *not*
+      // cover and fails if the elevation moves, which is what turns the
+      // exclusion list from a claim into a check.
+      `  craters.densityScale=${String(spec.craters.densityScale)}`,
+      `  craters.transitionDiameterKm=${String(spec.craters.transitionDiameterKm)}`,
+      `  craters.regolithMaturity=${String(spec.craters.regolithMaturity)}`,
       `  fbm.octaves=${String(spec.fbm.octaves)}`,
       `  fbm.frequency=${String(spec.fbm.frequency)}`,
       `  fbm.amplitude=${String(spec.fbm.amplitude)}`,

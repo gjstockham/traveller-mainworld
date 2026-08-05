@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { GEN_VERSION } from '../src/index.js';
+import { bandsForDepth, lodStepBound } from '../src/kernel/craters.js';
 import { DEFAULT_FBM } from '../src/kernel/fbm.js';
 import { interpretText } from '../src/ruleset/interpret.js';
 import { Material } from '../src/kernel/tilegen.js';
@@ -134,12 +135,27 @@ describe('seam-free generation', () => {
     expect(compared).toBe(n + 1);
   });
 
-  it('a tile and its refinement agree exactly where their vertices coincide', () => {
-    // The LOD guarantee: splitting a tile must not move the surface. Deeper
-    // tiles add octaves, they do not recompute what the coarse tile already
-    // decided.
+  it('a tile and its refinement agree exactly where no crater band was added', () => {
+    // Phase 0's LOD guarantee was absolute: splitting a tile did not move the
+    // surface at all, because octave count is a spec parameter rather than a
+    // function of depth.
+    //
+    // **WP10 weakened it, deliberately and by exactly one band.** A refinement
+    // adds the crater band its parent could not resolve, so the surface does
+    // move — that is what "deeper tiles add bands exactly as they add octaves"
+    // means in practice. What must still hold is that it moves by *that band and
+    // nothing else*, which is what `lodStepBound` states and what
+    // `craters.test.ts` measures against the real field.
+    //
+    // Between two depths that gate identically, the old guarantee is unchanged
+    // and is asserted here exactly.
     const n = 16;
-    const parentId = makeTileId(1, 3, 21);
+    const parentId = makeTileId(1, 1, 1);
+    expect(
+      bandsForDepth(1),
+      'depths 1 and 2 no longer share a band count; pick another pair',
+    ).toBe(bandsForDepth(2));
+
     const parent = gen.generate(parentId, WORLD, n);
     const child = gen.generate(tileChild(parentId, 0), WORLD, n);
 
@@ -153,6 +169,31 @@ describe('seam-free generation', () => {
       }
     }
     expect(compared).toBe((n / 2 + 1) * (n / 2 + 1));
+  });
+
+  it('a refinement that adds a band moves the surface, and only within the bound', () => {
+    // The other half. If a band gate opened and nothing moved, the band would
+    // not be reaching generation at all — and every LOD test here would be
+    // green over a planet with no crater detail below the first level.
+    const n = 16;
+    const parentId = makeTileId(1, 3, 21);
+    expect(bandsForDepth(4)).toBe(bandsForDepth(3) + 1);
+
+    const parent = gen.generate(parentId, WORLD, n);
+    const child = gen.generate(tileChild(parentId, 0), WORLD, n);
+    const bound = lodStepBound(4) * WORLD.spec.radiusKm * 1000;
+
+    let moved = 0;
+    for (let j = 0; j <= n / 2; j++) {
+      for (let i = 0; i <= n / 2; i++) {
+        const delta = Math.abs(
+          child.elevation[j * 2 * (n + 1) + i * 2]! - parent.elevation[j * (n + 1) + i]!,
+        );
+        expect(delta, `vertex ${i},${j}`).toBeLessThan(bound);
+        if (delta > 0) moved++;
+      }
+    }
+    expect(moved, 'the added band changed nothing anywhere').toBeGreaterThan(0);
   });
 
   it('tiles on adjacent FACES agree exactly on the shared cube edge', () => {

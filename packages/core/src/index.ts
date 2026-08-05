@@ -8,10 +8,31 @@
 /**
  * Generator version, embedded in share URLs, exports and golden hashes (PRD R14).
  * Any change that alters generated output for any input must bump this in the
- * same PR as the regenerated golden manifest — see the change protocol in
- * docs/plans/phase0-implementation-plan.md §7.4.
+ * same commit as the regenerated golden manifest — see the change protocol in
+ * `CHANGELOG.md`, which is the copy of it that is in version control.
+ *
+ * ## Why this is a prerelease
+ *
+ * Phase 1's plan assigns `0.2.0` to WP14, at the end. That is right for the
+ * final state and wrong for the six sessions in between: WP10 changes generated
+ * output many times over, `golden:update` refuses to regenerate a manifest while
+ * this string is unchanged (which is the gate working), and bumping
+ * `0.2.0 → 0.2.1 → 0.2.2` per commit would mint a string of versions that never
+ * existed for anyone.
+ *
+ * Prerelease identifiers instead, bumped once per re-pin rather than once per
+ * commit. Semver-valid, usable as a cache key and a URL parameter, and the tag
+ * says plainly that this was never emitted to a user — which is exactly the
+ * property that makes the README's phantom-version objection not apply.
+ * `0.2.0` proper lands when WP14 closes.
+ *
+ * Between re-pins `golden:verify:fixtures` is legitimately red. That is the
+ * cost, and it is smaller than the alternative — developing behind a flag
+ * defaulted off, which keeps the protocol quiet but means the fixture set is not
+ * hashing what is being built, forfeiting the composition-bug catching it exists
+ * for.
  */
-export const GEN_VERSION = '0.1.0';
+export const GEN_VERSION = '0.2.0-alpha.1';
 
 // Kernel — the whitelisted zone. See README for what may and may not go in here.
 export * from './kernel/ops.js';
@@ -22,6 +43,8 @@ export * from './kernel/noise.js';
 export * from './kernel/fbm.js';
 export * from './kernel/tileid.js';
 export * from './kernel/cubesphere.js';
+export * from './kernel/craters.js';
+export * from './kernel/tilegen.js';
 
 // The input layer (PRD §6.1) — UPP parsing and seed handling. Feeds the ruleset
 // interpreter rather than the kernel: nothing here reaches a golden hash.

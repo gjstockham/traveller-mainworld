@@ -30,6 +30,189 @@ above is the copy that is, and the README repeats it.
 
 ---
 
+## 0.2.0-alpha.1 — crater fields (WP10)
+
+**A prerelease, on purpose.** WP10 changes generated output many times over a
+multi-session work package, and `golden:update` refuses to regenerate a manifest
+while `GEN_VERSION` is unchanged — which is the gate working. Bumping
+`0.2.0 → 0.2.1 → 0.2.2` once per commit would mint a run of versions that never
+existed for anyone; a prerelease identifier bumped once per *re-pin* says plainly
+that this was never emitted to a user, which is the property the README's
+phantom-version objection turns on. `0.2.0` proper lands with WP14. Between
+re-pins `golden:verify:fixtures` is legitimately red.
+
+### Kernel
+
+- **Hierarchical crater fields** (`packages/core/src/kernel/craters.ts`), both
+  buckets of PRD §8.2: tier-1 global basins placed once per world, capped at 24
+  so every sample tests every basin in a bounded loop; tier-2 geometric bands,
+  each covering crater radii in `[r, 2r)`, placed on a **3D integer lattice**
+  rather than on cube-face cells. There are no faces in a lattice, so there is no
+  cell-level face adjacency to get wrong — the bug class that would have shown up
+  as a stripe of missing craters along a cube edge. Phase 1 open question 3 is
+  answered in favour of the lattice; the density variation within a cell has not
+  been assessed visually yet and the cube-face fallback stands until it is.
+
+- **Rational and polynomial profiles only.** Phase 0 open question 2 — can Phase
+  1 crater profiles avoid `exp`? — closes **yes**. Parabolic bowls with rim
+  uplift and a compact ejecta blanket, flat floors, terraced walls and central
+  peaks above the transition diameter, all over `rationalBump`, `compactFalloff`,
+  `smoothstep`, `smootherstep`, `powi` and `Math.sqrt`. The size distribution is
+  a genuine power law (`p(r) ∝ r⁻³`) sampled through an inverse CDF that needs
+  only a square root. Nothing new joined `approx.ts`.
+
+- **Compositing buckets by scale, then by age — a departure from the plan.**
+  Phase 1 plan §5.4 asks for age-ordered replacement, oldest first, and is right
+  that overlapping craters which merely *add* read as lumpy noise. What it does
+  not cover is craters of wildly different sizes: with one accumulator, a 700 m
+  crater landing inside an 8 km basin replaces the basin's whole depth, and since
+  the band carrying that small crater is gated in one LOD level later, a tile and
+  its parent then disagree by eight kilometres at a shared vertex. Measured at
+  1 811 m against a derived bound of 1 473 m before the fix. Relief now
+  accumulates in two registers, and a band that arrives at depth `d` changes the
+  total by its own contribution and nothing else.
+
+- **The LOD guarantee is weaker than Phase 0's, by exactly one band.** Splitting
+  a tile used to leave the surface untouched. It no longer does — a refinement
+  adds the crater band its parent could not resolve, which is what "deeper tiles
+  add bands exactly as they add octaves" means once the added thing has a
+  non-zero mean. `lodStepBound(depth)` states the bound, `craters.test.ts`
+  measures it against the real field, and `generator.test.ts` asserts both
+  halves: exact agreement where the gate does not move, and bounded disagreement
+  where it does.
+
+- **The band gate takes depth alone.** Making it a function of the caller's grid
+  size would have the same tile evaluate different bands at 65² and 129², so the
+  viewer and the golden fixtures would disagree at the vertices they share —
+  turning Phase 1 open question 1 into a seam rather than an open question. It is
+  calibrated at 64 rather than 128 so the hashed 129² path oversamples rather
+  than the shipped 65² path aliasing. Open question 1 is **not** closed here, and
+  is no worse than it was.
+
+- **The tile apron** (`(n+3)²`, one ring beyond the tile on each side), generated
+  in this loop rather than bolted on in WP12. Roughly 6% more samples at 65², and
+  the artefact it removes is a normal discontinuity at every tile edge — a
+  wireframe grid drawn over the whole planet. Not hashed: it carries no
+  information the interior does not. What is asserted instead is the
+  relationship, exactly — that a ring value equals the neighbouring tile's own
+  interior value, within a face. Across a cube-face boundary it is an
+  extrapolation, the same twelve edges the skirts already name.
+
+- **The point-sample path** (`sampleElevation`), and the equality that WP13 rests
+  on: point-path and tile-path outputs are bit-identical over the whole fixture
+  tile set — ten worlds, six faces, depths 0–6, every face corner. The two are
+  genuinely different code, which is what stops the test being a tautology: the
+  tile path amortises the lattice hashing into a per-tile cell cache and the
+  point path hashes per sample. Perturbing the cache's origin by one cell reddens
+  ten tests.
+
+### Viewer
+
+- **The skirt was about a hundred times too short.** `skirtDepthFor` derived the
+  crack at an LOD boundary from the fBm's statistical self-similarity, which was
+  right when there was nothing else in the field. A crater band's relief is set
+  by the crater's own depth rather than by a fraction of the world's total
+  relief, so it does not shrink the same way, and the wall would have stopped
+  covering the gap it exists to cover. It now carries a third term from
+  `lodStepBound`, and `tileMesh.test.ts` holds the two together.
+
+- `?meshprobe=1` — fills a new tile mesh's vertex-colour buffer with magenta, to
+  split the three hypotheses for the black-flicker finding in
+  `docs/evidence/spikec-exit.md`. Presentation only.
+
+### Determinism battery
+
+- **Digest `513f7af66fbd228c…`** (was `0c6181a0…`). Twenty of the twenty-one
+  cases are unchanged to the bit — they measure kernel *functions* and no kernel
+  function moved. The one that moved is `tile.composite`, which composes them
+  into a tile and therefore runs the crater pass.
+
+  This matters for citations. Evidence blocks that quote `0c6181a0…` — the
+  hand-check records in `docs/evidence/wp4-manual-checks.md`, and ADR-0001's
+  acceptance — rest on the *arithmetic* being stable across engines, and that
+  claim is untouched: no approximation, no hash, no noise function changed. But
+  the digest they name no longer exists, so any block quoting it now records a
+  build rather than a current result, and the manual checks need re-running
+  before Phase 1's exit evidence cites them.
+
+### Golden fixtures
+
+- **Fixture set `4f23f0304c09635f…`** (was `289a78e59ada7f5b…`), fixture digest
+  `9131b09897abad9b…` (was `9c0f8603…`). The three
+  `craters.*` fields moved out of `fixtures.test.ts`'s `NOT_YET_GENERATED` list
+  and into `serialiseFixtureSpecs`, because `generateTile` now reads them. A
+  field that reaches generation without reaching this hash is a fixture set that
+  cannot tell two different worlds apart.
+
+- **The exclusion list is now checked rather than claimed.** Every remaining
+  entry is perturbed, one small tile is regenerated, and the elevation hash must
+  not move. WP9 could not write this test — every excused field was unread, so it
+  would have passed vacuously over all eleven and proved nothing about any. It
+  stopped being vacuous the moment a crater parameter reached the tile pass, and
+  it names the offending field when it fires. It did fire, on
+  `craters.densityScale`, which is how those three came to be moved.
+
+  Worth recording: the first version perturbed by one ulp and passed over
+  `densityScale` in silence. That field is the acceptance threshold for every
+  crater candidate on the planet, so a one-ulp step changes no decision anywhere.
+  A one-ulp step is the right probe for whether a *serialiser* reads a field and
+  the wrong one for whether *generation* does.
+
+### The archived WASM twin
+
+- **`crates/kernel-wasm` does not implement the crater pass**, so it no longer
+  agrees with the TypeScript kernel on a tile. That is the drift ADR-0001
+  accepted by name when it archived the crate rather than maintaining it, and
+  `tile.composite` is where it shows. That one case is now **excluded from the
+  parity comparison**, named in `UNIMPLEMENTED_IN_TWIN`, and printed in every
+  passing report — leaving it in would turn `pnpm check:parity` permanently red
+  and train whoever saw it to ignore the one check that says two independent
+  implementations agree. The other twenty cases are kernel functions and still
+  compare bit-for-bit over the full battery.
+
+  What is lost is real and should not be glossed: `tile.composite` was the only
+  place a *second implementation* checked that composing kernel functions into a
+  tile is correct, and a kernel function can be perfectly stable while the
+  composition of them is not. The golden fixture set still checks composition,
+  but against the TypeScript kernel's own past output rather than against
+  another kernel — which is a weaker claim, and the one the ADR accepted.
+
+  `packages/viewer/test/tileJob.test.ts` keeps its byte-exact comparison by
+  running both kernels over a world with `densityScale: 0`, where the TypeScript
+  elevation is its base fBm field and the twin computes the same thing — plus an
+  assertion that the crater-free world really is crater-free, so the comparison
+  cannot quietly become a comparison of nothing.
+
+### Not done in this work package
+
+- The crater fields have **not been looked at**. Browser work happens on the
+  Windows side; the visual acceptance criteria in plan §5 — saturated at Size
+  1–2, sparse at Size 9–A, no seam introduced at any LOD or face boundary — and
+  the C2 re-fly are outstanding.
+- **Cost is not properly measured, but it is close enough to the budget to say
+  so now.** Warmed medians of 15 runs, `size4-luna` (density 1.0), Node 24 under
+  WSL2 — *not* the integrated-GPU laptop the R13 budget is written against, and
+  not the bench harness with its warm-up, sink and percentiles:
+
+  | | d0 | d4 | d8 | d10 | d12 |
+  |---|---:|---:|---:|---:|---:|
+  | 65² | 16.5 | 16.5 | 20.6 | 24.2 | 27.5 |
+  | 129² | 58.4 | 60.4 | 80.2 | 95.5 | **111.0** |
+
+  Two things are worth reading off it. **The base fBm dominates at shallow
+  depth** — depth 0 gates in no crater bands at all, so its 58 ms at 129² is
+  terrain, and the crater pass roughly doubles the cost by depth 12 rather than
+  tripling it. And **129² crosses the ≈100 ms budget somewhere past depth 10**,
+  which is ADR-0001's R4 trigger. 65² has three times that headroom.
+
+  This lands squarely on Phase 1 open question 1 (65² vs 129²), which WP15
+  closes: the shipped path meshes at 65² and the hashed path generates at 129².
+  Nothing here closes it, and the plan's listed mitigations — cheaper band
+  gating, tighter saturation caps, further amortisation — are all still
+  untouched. Per-tile candidate amortisation is done; per-tile basin culling and
+  merging the two apron passes are not, and both are ordinary optimisations
+  rather than kernel decisions.
+
 ## Unreleased
 
 ### Ruleset interpretation (WP9)

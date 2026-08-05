@@ -5,6 +5,14 @@
  * golden battery can swap one for the other without knowing which they have.
  * That seam is what makes the WP6 kernel decision revisable rather than a
  * rewrite.
+ *
+ * **It is Phase 0's generator.** ADR-0001 archived the twin rather than
+ * maintaining it, and WP10's crater pass exists only in the TypeScript kernel —
+ * so this class produces base fBm terrain, writes no apron, and no longer agrees
+ * with `TsTileGenerator` on a tile. That is the drift the ADR accepted by name;
+ * `pnpm check:parity`'s `tile.composite` case is where it shows. The twin is
+ * still the only evidence that two independent implementations agree on the
+ * *kernel functions*, which is what the battery's other twenty cases compare.
  */
 import { assertClean } from '../digest/bytes.js';
 import type { World } from '../spec.js';

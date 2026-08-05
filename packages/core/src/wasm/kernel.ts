@@ -16,7 +16,7 @@
  */
 import type { FbmParams } from '../kernel/fbm.js';
 import type { Direction, FaceUv } from '../kernel/cubesphere.js';
-import type { TileGenInput, TileGenOutput } from '../kernel/tilegen.js';
+import type { BaseTileGenInput, TileGenOutput } from '../kernel/tilegen.js';
 
 /** ABI revision this binding speaks. Must match `tm_abi_version()` in the crate. */
 const EXPECTED_ABI_VERSION = 1;
@@ -214,7 +214,15 @@ export interface WasmKernel {
   tileChild(id: number, childIndex: number): number;
   tileBounds(id: number): { u0: number; v0: number; size: number };
 
-  generateTile(input: TileGenInput, out: TileGenOutput): void;
+  /**
+   * Generate one tile.
+   *
+   * Takes {@link BaseTileGenInput} — the Phase 0 field set — rather than the
+   * TypeScript kernel's `TileGenInput`. The twin is archived and does not
+   * implement Phase 1's crater pass, so a signature that accepted the crater
+   * parameters would advertise that it honoured them.
+   */
+  generateTile(input: BaseTileGenInput, out: TileGenOutput): void;
 }
 
 /** Bytes of scratch space for small out-parameters. Ample: the largest is 216 doubles. */
