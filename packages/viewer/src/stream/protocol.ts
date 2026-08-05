@@ -43,6 +43,16 @@ export interface TileReadyMessage {
   readonly positions: Float32Array;
   /** `3 * vertexCount(n)` floats. */
   readonly colours: Float32Array;
+  /**
+   * `3 * vertexCount(n)` floats: smooth per-vertex normals, from the apron.
+   *
+   * Sent rather than derived on arrival because it is the apron the normals
+   * come from, and the apron never crosses this boundary — `(n+3)²` doubles is
+   * more than the three Float32 buffers put together, and computing normals on
+   * the main thread would put a per-tile loop back into the frame that
+   * `runTileJob` exists to keep out of it.
+   */
+  readonly normals: Float32Array;
   /** Minimum and maximum elevation in metres, for diagnostics and camera limits. */
   readonly minElevation: number;
   readonly maxElevation: number;

@@ -10,9 +10,18 @@ import { expect, test } from '@playwright/test';
  * Spike C exit criteria. What it does do is stop the skeleton silently breaking.
  */
 
+/**
+ * The diagnostics panel.
+ *
+ * Located by `data-role` rather than by element type: WP12 put a second `pre`
+ * and several more buttons on the page, and `#app pre` stopped naming one
+ * thing. The attribute exists for this.
+ */
+const OVERLAY = '#app pre[data-role="diagnostics"]';
+
 /** Read the diagnostics overlay, which is the app's own view of its health. */
 async function readOverlay(page: import('@playwright/test').Page): Promise<string> {
-  return (await page.locator('#app pre').innerText()).trim();
+  return (await page.locator(OVERLAY).innerText()).trim();
 }
 
 /**
@@ -25,7 +34,7 @@ async function readOverlay(page: import('@playwright/test').Page): Promise<strin
  * test. Waiting for the first line to appear removes the window.
  */
 async function awaitOverlay(page: import('@playwright/test').Page): Promise<void> {
-  await expect(page.locator('#app pre')).toContainText('fps', { timeout: 20_000 });
+  await expect(page.locator(OVERLAY)).toContainText('fps', { timeout: 20_000 });
 }
 
 function metric(overlay: string, label: string): number {
@@ -95,9 +104,10 @@ test('hands back a pasteable evidence block', async ({ page, context }) => {
     .poll(async () => metric(await readOverlay(page), 'tiles'), { timeout: 30_000 })
     .toBeGreaterThan(5);
 
-  // Located structurally, not by name: the label is what the click changes, so
-  // a name-based locator stops matching the element it just pressed.
-  const button = page.locator('#app button');
+  // Located by role attribute, not by name: the label is what the click
+  // changes, so a name-based locator stops matching the element it just
+  // pressed — and `#app button` stopped being unique when WP12 landed.
+  const button = page.locator('#app button[data-role="copy-evidence"]');
   await expect(button).toHaveText('Copy evidence');
   await button.click();
   await expect(button).toHaveText('Copied', { timeout: 5_000 });
@@ -153,7 +163,7 @@ test('discloses hidden time rather than booking it as a stall', async ({ page })
     fake('visible');
   });
 
-  await expect(page.locator('#app pre')).toContainText('hidden in 1 gap', { timeout: 10_000 });
+  await expect(page.locator(OVERLAY)).toContainText('hidden in 1 gap', { timeout: 10_000 });
   const overlay = await readOverlay(page);
   expect(overlay).toContain('total');
   expect(overlay).toContain('active');

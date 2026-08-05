@@ -30,6 +30,84 @@ above is the copy that is, and the README repeats it.
 
 ---
 
+## Unreleased — WP12: the viewer
+
+**No identity moved, and a viewer work package that moved one would be a bug.**
+Nothing in this work package touches `packages/core`: normals are computed from
+the apron WP10 already generated, the palette is WP11's, and the input UI only
+decides which world gets asked for. Both golden artefacts verify unchanged
+against the committed manifests.
+
+- **Smooth per-vertex normals, from the apron** (`viewer/src/mesh/tileNormals.ts`).
+  Flat shading was right for a Phase 0 noise sphere and wrong for craters: a 65²
+  tile flat-shades a rim into facets, and a rim's whole character is a curve. The
+  `(n+3)²` apron has existed since WP10 for exactly this and had no reader until
+  now. Within a cube face two same-depth neighbours produce **bit-identical**
+  normals at every shared vertex — asserted exactly, over shared columns, shared
+  rows and the corner where four tiles meet.
+
+- **Across the twelve cube edges it is an extrapolation, and here is the number.**
+  The ring continues face A's own parameterisation past `u = 1` instead of
+  crossing onto face B, so the two tiles difference over slightly different
+  steps. Measured on `X400000-0` at true scale: mean 0.6–2.0°, max 2.6–11.1° over
+  depths 1, 3 and 5, rising with depth as finer crater bands steepen the slope.
+  With relief switched off it is under 0.03°, which is what identifies it as a
+  relief effect rather than a geometry bug. For scale, the artefact the apron
+  *removes* — a one-sided difference at every tile edge — measures mean 0.9–2.3°
+  and max 6.0–15.9° at the same depths. So this is the same size of step confined
+  to twelve edges instead of spread over the whole quadtree. The fix is the
+  cross-face rotation table the skirts already want for those same twelve edges,
+  and it belongs in `tilegen.ts` where the ring is generated: a work package, not
+  a constant. The alternative — flattening the normal toward the geometric one
+  near a face boundary — trades a bounded step for an unbounded band of wrong
+  shading, and was rejected on that.
+
+- **Skirt vertices take their edge vertex's normal**, which is worth more than
+  consistency. The wall is near-radial, so its geometric normal points sideways
+  and it renders almost black — the dark hairline the README describes at every
+  unnecessary tile join. With the surface normal, a sliver that peeks through
+  shades like the terrain beside it.
+
+- **Ambient light dropped from 0.35 to 0.03** against an unchanged sun of 3.0.
+  R19 says "none" for a vacuum world and means it; what is left is the difference
+  between a tile that is unlit and a tile that never arrived, which a streaming
+  viewer has no other way to show. Raising it is how the stark vacuum look gets
+  thrown away one tenth at a time — WP11 built a real albedo field precisely so
+  the terminator could carry the picture. The sun's direction is now adjustable
+  (R20) as azimuth and elevation, defaulting low at 60°/15° because a high sun
+  flattens a crater field into albedo.
+
+- **The input UI, the info panel and the reduced-fidelity badge** (R1–R3, R21).
+  The parser's own message — which names the offending position — is shown beside
+  the field, and **the world already on screen stays**. Before this a bad UPP
+  replaced the entire page with red text, which was right when the only way to
+  supply one was the address bar and wrong the moment there is a field to mistype
+  into: the fix for a typo is to see the typo. Atmo outside 0–1 or Hydro outside
+  0 renders as the rocky world underneath with a badge naming the codes and what
+  was drawn instead; Size 0 keeps the §3 refusal, because a permanent non-goal is
+  not a pending phase.
+
+- **The default route is now a real interpreted UPP** (`F20076C-F`, Luna as the
+  Traveller wiki writes it). The Phase 0 stand-in interpreted `X200000-0` and then
+  overrode radius, relief and fBm — harmless while nothing on screen claimed
+  otherwise, and not harmless beside a field showing a UPP. The consequence worth
+  knowing: Spike C evidence blocks recorded before this were flown against the
+  stand-in and say `default world`, where a block from this build names the UPP.
+
+- **Share URLs carry all four parameters R27 names.** `?ruleset=` resolves through
+  `requireRuleset` and fails loudly on an id this build does not have. `?gen=` is
+  **refused by name** when it is not this build's version: R15 obliges the app to
+  render older versions and WP14 builds the registry that will, and until then the
+  dangerous outcome is not an error but a plausible-looking world that is not the
+  one the link promised. Camera and sun are separate optional parameters, so a URL
+  without them still works.
+
+- **Applying a UPP rebuilds in place rather than reloading.** §9.2 gives
+  paste-to-globe ten seconds and a reload spends part of it re-acquiring a WebGL
+  context to arrive at a scene it already had — and it would throw away the camera
+  on every re-roll, which is the case U4 exists for. `main.ts` now separates a
+  shell that lives as long as the page from a session that belongs to one world.
+
 ## 0.2.0-alpha.4 — regolith and materials
 
 **Both manifests moved.** WP11 adds a sixth output buffer and replaces the

@@ -3,9 +3,9 @@
 A browser-based tool that turns a Universal Planetary Profile (UPP) plus a seed into a fully explorable 3D planet. Paste `C867A69-8`, get a world you can orbit, zoom into, and export as a projected 2D map.
 
 **Status:** Phase 1 (airless rocky worlds), in progress. Phase 0 is complete. The
-UPP parser, the `cepheus-1` interpretation layer, hierarchical crater fields and
-the regolith palette have landed; the input UI, export package and share URLs
-have not. See [the PRD](docs/requirements/worldgen-prd.md) for scope.
+UPP parser, the `cepheus-1` interpretation layer, hierarchical crater fields, the
+regolith palette, the input UI and share URLs have landed; the export package has
+not. See [the PRD](docs/requirements/worldgen-prd.md) for scope.
 
 The generator version is a **prerelease** (`0.2.0-alpha.4`) for the duration of
 Phase 1 — see [`CHANGELOG.md`](CHANGELOG.md) for why, and for what moves between
@@ -79,9 +79,44 @@ with whether ADR-0001's R4 performance trigger fires and Phase 1 open question 1
 (65² vs 129²), which the gap between those two rows now bears directly on. Until
 then the model stays where it is and should not be quoted as a Phase 1 figure.
 
-The viewer takes `?upp=<string>` to fly a real UPP, `?seed=<text>` to change
-world, `?debug=1` to preserve the WebGL drawing buffer so pixels can be read
-back, and `?fixture=<id>` to fly one of the ten golden fixture worlds:
+## Using the viewer
+
+Paste a UPP, press Generate. The panel top right holds the UPP and seed fields, a
+re-roll control, the plain-English `cepheus-1` interpretation of all eight
+positions, the world's identity block (seed, generator version, ruleset) and a
+sun-direction control. A malformed UPP produces the parser's own message —
+naming the offending position — beside the field, **and leaves the world already
+on screen alone**, because the fix for a typo is to see the typo.
+
+Anything outside Atmo 0–1 / Hydro 0 renders as the rocky world underneath, with a
+badge naming which codes are not honoured and what was drawn instead. That is
+PRD §7's rule: every valid UPP loads at every phase. Size 0 gets the §3 refusal
+rather than a badge — a belt is a permanent non-goal, not a pending phase.
+
+### Query parameters
+
+| Parameter | Effect |
+|---|---|
+| `?upp=<string>` | The world. Defaults to `F20076C-F` — Luna, as the Traveller wiki writes it. |
+| `?seed=<text>` | Any string, hashed to 64 bits. Blank rolls one and shows it. |
+| `?ruleset=<id>` | Interpretation layer. `cepheus-1` today; an unknown id is refused by name. |
+| `?gen=<version>` | Generator version. **Refused unless it is this build's** — see below. |
+| `?cam=<az,el,km>` | Optional camera pose. A URL without it still works. |
+| `?sun=<az,el>` | Optional sun direction, in degrees. Defaults to `60,15`. |
+| `?exaggeration=<n>` | Vertical exaggeration for inspection. Default 1, true scale. |
+| `?fixture=<id>` | One of the ten golden fixture worlds, instead of a UPP. |
+| `?debug=1` | Preserve the WebGL drawing buffer so pixels can be read back. |
+| `?meshprobe=1` | Fill new meshes with magenta — see below. |
+
+The first four are R27's share URL, and "Copy link" builds one. **`?gen=` is
+refused rather than honoured** when it names a version this build does not
+produce: R15 obliges the app to render worlds from older generator versions and
+the `generatorFor(version)` registry that will do it is WP14's, so until then the
+dangerous outcome is not an error — it is rendering someone's link with the
+current generator and showing a world that is not the one it promised. Nothing
+has been released, so no such link should exist.
+
+`?fixture=` flies one of the ten golden fixture worlds:
 
 ```
 ?fixture=size1-rockball   size2-cinder     size3-ceres      size4-luna
@@ -99,23 +134,24 @@ rather than a copy that could drift. An unknown id is refused with the list
 rather than silently falling back to the default world, and `?seed=` is refused
 alongside `?fixture=` because a fixture's seed is part of what is pinned.
 
-**`?upp=` is the only route that shows a world the interpreter actually
+**Everything except `?fixture=` shows a world the interpreter actually
 produced.** Every fixture overrides the fBm parameters after interpreting —
-deliberately, since the set exists to discriminate — and the default world
-overrides radius, relief and fBm too, so `cepheus-1`'s own `fbmFrequency` and
-`fbmOctaves` columns had never been rendered once. `?upp=` overrides nothing, and
-combines with `?seed=`:
+deliberately, since the set exists to discriminate — so `cepheus-1`'s own
+`fbmFrequency` and `fbmOctaves` columns are only ever seen on the UPP route. That
+route overrides nothing:
 
 ```
-?upp=F20076C-F            Luna, as the Traveller wiki writes it
+?upp=F20076C-F            Luna, as the Traveller wiki writes it (the default)
 ?upp=H30016A-F&seed=7     Callisto, re-rolled
-?upp=C867A69-8            an ordinary mainworld
+?upp=C867A69-8            an ordinary mainworld — badged, Atmo 6 / Hydro 7
 ```
 
-It is a slice of WP12, not WP12: there is no input UI, no info panel, no
-reduced-fidelity badge and no `gen`/`ruleset` parameters yet. A malformed UPP is
-refused with the parser's own message, which names the offending position, and
-Size 0 is refused with the §3 reason rather than rendered as a broken planet.
+The **default** world was itself a hand-overridden stand-in until WP12: it
+interpreted `X200000-0` and then replaced radius, relief and fBm. That was
+harmless while nothing on screen claimed otherwise and stopped being harmless the
+moment there was a field showing a UPP beside the planet. Note when reading old
+evidence: a Spike C session block recorded before WP12 says `default world` and
+was flown against the stand-in; a block from this build names the UPP.
 
 Every world is framed from the **same absolute altitude** (15 000 km), not the
 same multiple of its own radius, so apparent size tracks real size: a Size 1
@@ -148,10 +184,31 @@ almost certainly a skirt wall caught face-on. Presentation only.
 What this exposes is that almost everything visible on these worlds *was*
 displacement. At true scale they were smooth spheres with four hard-edged albedo
 bands, because the things that give a real body its face were not built yet.
-Craters are the first of them and have landed; what is still missing is albedo
-that tracks geology rather than elevation (Phase 4), and shading from the true
-elevation gradient at full resolution — smooth per-vertex normals, which is what
-the apron below exists for (WP12). Photorealism is those, not a multiplier.
+Craters landed in WP10, a real albedo field in WP11, and **shading from the true
+elevation gradient in WP12** — smooth per-vertex normals off the apron, which is
+what makes a rim read as a curve rather than a ring of facets. What is still
+missing is albedo that tracks geology rather than an impact record (Phase 4).
+Photorealism is those, not a multiplier.
+
+## Lighting
+
+One directional sun, no shadow maps, and ambient at a hundredth of the sun.
+
+R19's answer for a vacuum world is "no scattering", and it means it: there is no
+atmosphere to fill a shadow, so the physically correct night side is black and
+the physically correct crater floor at low sun is black too. The ambient that
+remains is not a lighting choice — it is the difference between a tile that is
+unlit and a tile that never arrived, which a streaming viewer has no other way to
+show. Raising it is how the stark vacuum look gets thrown away one tenth at a
+time.
+
+The sun defaults to azimuth 60°, elevation 15°, and `?sun=` or the panel control
+moves it. **Low on purpose:** at high sun a cratered surface reads as flat
+albedo, which is what every full-moon photograph looks like and is exactly what
+WP10 and WP11 built something better than. Shadow maps are a phase of their own
+across a streaming LOD tile set — the cascade would have to follow the same
+quadtree the tiles do — and the terminator plus self-shading carries the look
+without them.
 
 ## Skirts and seams
 
@@ -160,10 +217,13 @@ crack can open. Rather than stitching edges — which would need neighbour
 awareness inside generation — each tile carries a **skirt**: a wall of
 duplicated edge vertices pushed inward to plug the gap from behind.
 
-Skirts are not free. The wall is near-radial, so it is barely lit and renders
-almost black; multisampling then blends the surface against it and leaves a
-hairline at every tile join. Drawn unconditionally, that is a dark grid tracing
-the whole quadtree across the globe.
+Skirts are not free. The wall is near-radial, so its *geometric* normal points
+sideways; multisampling then blends the surface against a barely-lit wall and
+leaves a hairline at every tile join. Drawn unconditionally, that is a dark grid
+tracing the whole quadtree across the globe. **WP12 took some of the sting out
+of this**: skirt vertices now carry their edge vertex's surface normal rather
+than the wall's own, so a sliver that does peek through shades like the terrain
+beside it instead of like a shadow.
 
 So skirts are drawn **only where they are needed**. Adjacent tiles at the same
 depth share their edge vertices bit-for-bit (the kernel's seam guarantee), so
@@ -188,13 +248,33 @@ against the real field rather than argued for in a comment. It settles at around
 5% of a tile edge, and that figure is scale-invariant — making it smaller means
 gating bands in later, not tuning the skirt.
 
-**The apron.** Tile generation also produces an `(n+3)²` elevation grid, one ring
-beyond the tile on each side. It is not drawn: WP12 needs it to compute smooth
-per-vertex normals, because a normal at an edge vertex needs elevation from
-outside the tile and without it every tile boundary gets a normal discontinuity
-that reads as a wireframe grid over the whole planet. Within a face the ring is
-the neighbour's own elevation bit-for-bit; across a cube-face boundary it is an
-extrapolation, the same twelve edges named above.
+**The apron, and the normals it feeds.** Tile generation also produces an
+`(n+3)²` elevation grid, one ring beyond the tile on each side. It is not drawn:
+`viewer/src/mesh/tileNormals.ts` computes smooth per-vertex normals from it,
+because a normal at an edge vertex needs elevation from *outside* the tile.
+Without it the estimator has to change shape at the border, so the normal at a
+shared vertex depends on which tile computed it — a shading discontinuity along
+every tile boundary, which reads as a wireframe grid over the whole planet.
+
+Within a face the ring is the neighbour's own elevation bit-for-bit, and the
+resulting normals at a shared vertex are **bit-identical** between same-depth
+neighbours. Three things make that true and all three are load-bearing: the ring
+equality; face UVs computed exactly as `tilegen.ts` computes them, over dyadic
+rationals, so two tiles land on the same double rather than merely the same real
+number; and one estimator everywhere, with no special case at the border.
+`tileNormals.test.ts` asserts it exactly rather than approximately.
+
+*Known limitation, and it is the same twelve edges again.* Across a cube-face
+boundary the ring continues face A's own parameterisation past `u = 1` instead of
+crossing onto face B, so the two tiles difference over slightly different steps.
+Measured on `X400000-0` at true scale: mean 0.6–2.0° and max 2.6–11.1° over
+depths 1, 3 and 5, rising with depth as finer crater bands steepen the local
+slope; under 0.03° with the relief switched off, which is what identifies it as a
+relief effect rather than a geometry bug. For scale, the artefact the apron
+*removes* — a one-sided difference at every tile edge — measures mean 0.9–2.3°
+and max 6.0–15.9° at the same depths. So it is the same size of step confined to
+twelve edges rather than spread over the whole quadtree, on edges that are
+already skirted unconditionally for the same missing rotation table.
 
 ## The two golden artefacts
 

@@ -74,9 +74,19 @@ export class OrbitCamera {
   private thetaVelocity = 0;
   private phiVelocity = 0;
   private zoomVelocity = 0;
+  /**
+   * Retreat bound, held here rather than read from the options every frame.
+   *
+   * {@link reframe} moves it. It has to: the bound must clear the framing
+   * altitude, or applying a new world would clamp the camera straight back to a
+   * framing that hides the world's size — which is the whole thing the absolute
+   * altitude exists to convey.
+   */
+  private maxAltitude: number;
 
   constructor(private readonly options: OrbitCameraOptions = DEFAULT_ORBIT) {
     this.altitude = options.radius * options.initialAltitude;
+    this.maxAltitude = options.maxAltitude;
   }
 
   /** Distance from the planet centre. */
@@ -131,6 +141,57 @@ export class OrbitCamera {
    */
   zoom(notches: number): void {
     this.zoomVelocity += notches * this.options.zoomSensitivity;
+  }
+
+  /**
+   * Where the camera is, in the degrees the share URL and the panel use.
+   *
+   * Degrees rather than radians because both consumers are human-facing: a
+   * `?cam=` a reader can sanity-check by eye is worth more than three decimal
+   * places of a radian, and the camera is presentation — nothing here reaches a
+   * generated value, so the rounding a degree costs cannot matter.
+   */
+  get orientationDeg(): { azimuthDeg: number; elevationDeg: number } {
+    return {
+      azimuthDeg: (this.theta * 180) / Math.PI,
+      elevationDeg: (this.phi * 180) / Math.PI,
+    };
+  }
+
+  /**
+   * Place the camera, in the same degrees {@link orientationDeg} reports.
+   *
+   * @param altitude Height above the surface in scene units. Clamped by the
+   *                 same bounds a zoom is, so a `?cam=` naming an altitude
+   *                 inside the planet lands at the closest approach rather than
+   *                 inside the terrain.
+   */
+  setPose(azimuthDeg: number, elevationDeg: number, altitude: number): void {
+    this.theta = (azimuthDeg * Math.PI) / 180;
+    this.phi = Math.max(-MAX_PHI, Math.min(MAX_PHI, (elevationDeg * Math.PI) / 180));
+    this.altitude = Math.max(
+      this.options.radius * this.options.minAltitude,
+      Math.min(this.options.radius * this.maxAltitude, altitude),
+    );
+    this.halt();
+  }
+
+  /**
+   * Frame a newly-applied world: a fresh altitude, and a retreat bound that
+   * clears it.
+   *
+   * Applying a UPP does not move the camera's *orientation* — the world under
+   * it changed, not the direction it is looking from, and resetting the azimuth
+   * on every re-roll would make comparing two seeds harder than it needs to be.
+   * Altitude does reset, because it is what makes size legible and the previous
+   * world's framing means nothing on this one.
+   *
+   * @param initialAltitude Height above the surface, as a multiple of radius.
+   */
+  reframe(initialAltitude: number): void {
+    this.maxAltitude = Math.max(this.options.maxAltitude, initialAltitude * 3);
+    this.altitude = this.options.radius * initialAltitude;
+    this.halt();
   }
 
   /** Stop all motion immediately. */
@@ -192,7 +253,7 @@ export class OrbitCamera {
     this.phi = Math.max(-MAX_PHI, Math.min(MAX_PHI, this.phi));
     this.altitude = Math.max(
       this.options.radius * this.options.minAltitude,
-      Math.min(this.options.radius * this.options.maxAltitude, this.altitude),
+      Math.min(this.options.radius * this.maxAltitude, this.altitude),
     );
   }
 }

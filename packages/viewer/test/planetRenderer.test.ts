@@ -30,6 +30,7 @@ function blankTile(tileId: number): {
   n: number;
   positions: Float32Array;
   colours: Float32Array;
+  normals: Float32Array;
   minElevation: number;
   maxElevation: number;
 } {
@@ -39,6 +40,7 @@ function blankTile(tileId: number): {
     n: N,
     positions: new Float32Array(verts * 3),
     colours: new Float32Array(verts * 3),
+    normals: new Float32Array(verts * 3),
     minElevation: 0,
     maxElevation: 0,
   };

@@ -1,15 +1,40 @@
-import { FIXTURES, interpretText } from '@traveller-mainworld/core';
+import {
+  CEPHEUS_1,
+  FIXTURES,
+  type ParsedUpp,
+  describeUpp,
+  interpretText,
+  isUppError,
+  parseUpp,
+} from '@traveller-mainworld/core';
 import { describe, expect, it } from 'vitest';
 
-import { chooseWorld, defaultWorld, fixtureIds } from '../src/world/choice.js';
+import { DEFAULT_UPP, chooseWorld, defaultWorld, fidelityFor, fixtureIds } from '../src/world/choice.js';
 
 const q = (search: string): URLSearchParams => new URLSearchParams(search);
 
+/** Parse, or fail the test with the parser's own message. */
+function asUpp(text: string): ParsedUpp {
+  const parsed = parseUpp(text);
+  if (isUppError(parsed)) {
+    throw new Error(parsed.message);
+  }
+  return parsed;
+}
+
 describe('chooseWorld', () => {
-  it('defaults to the Phase 0 rockball when nothing is asked for', () => {
+  it('defaults to an interpreted UPP, overriding nothing', () => {
+    // WP12 replaced the Phase 0 stand-in here. The stand-in interpreted
+    // `X200000-0` and then overrode radius, relief and fBm, which was harmless
+    // while nothing on screen claimed otherwise and is not harmless beside an
+    // input field showing a UPP. So the assertion is not merely "it is the
+    // default world" — it is that the default world is what the interpreter
+    // says about `DEFAULT_UPP`, with nothing on top.
     const choice = chooseWorld(q(''));
     expect(choice.fixtureId).toBeUndefined();
     expect(choice.world).toEqual(defaultWorld('42').world);
+    expect(choice.world.spec).toEqual(interpretText(DEFAULT_UPP));
+    expect(choice.upp?.canonical).toBe(DEFAULT_UPP);
   });
 
   it('hashes ?seed= into the default world', () => {
@@ -124,12 +149,87 @@ describe('?upp=', () => {
     expect(() => at('upp=X400000-0&fixture=size4-luna')).toThrow(/cannot be combined/);
   });
 
+  it('interprets under the ruleset named, and refuses one it does not have', () => {
+    // R27 carries the ruleset id, so it is a promise to a URL somebody else is
+    // holding. A build without `cepheus-2` must say so rather than quietly
+    // reading the world under `cepheus-1`.
+    expect(at('upp=X400000-0&ruleset=cepheus-1').ruleset?.id).toBe('cepheus-1');
+    expect(() => at('upp=X400000-0&ruleset=cepheus-2')).toThrow(/unknown ruleset 'cepheus-2'/);
+    expect(() => at('upp=X400000-0&ruleset=cepheus-2')).toThrow(/cepheus-1/);
+  });
+
+  it('refuses ?ruleset= together with ?fixture=', () => {
+    // A fixture's spec is pinned rather than interpreted, so accepting a
+    // ruleset id would imply a re-interpretation that does not happen.
+    expect(() => at('fixture=size4-luna&ruleset=cepheus-1')).toThrow(/pinned rather than/);
+  });
+
   it('names itself in the overlay stamp rather than claiming to be the default', () => {
     // The stamp is what ties a recorded observation to what was on screen.
     // Deriving it from `fixtureId` worked with two routes and mislabelled every
     // UPP world the moment there were three.
+    //
+    // From WP12 the no-parameter route names a UPP too, because it *is* one:
+    // the old stand-in interpreted `X200000-0` and then overrode radius, relief
+    // and fBm, which is not a thing the input field could honestly display.
     expect(at('upp=X400000-0').short).toBe('X400000-0');
     expect(at('fixture=size4-luna').short).toBe('size4-luna');
-    expect(at('').short).toBe('default world');
+    expect(at('').short).toBe(DEFAULT_UPP);
+  });
+});
+
+describe('reduced fidelity (PRD §7)', () => {
+  const fidelityOf = (text: string): ReturnType<typeof fidelityFor> =>
+    fidelityFor(asUpp(text), CEPHEUS_1);
+
+  it('is silent for the worlds Phase 1 actually renders', () => {
+    // Atmo 0-1, Hydro 0 — the phase's whole scope. A badge on these would be
+    // a badge that is always on, which is a badge nobody reads.
+    for (const upp of ['X100000-0', 'F20076C-F', 'X800000-0', 'XA10000-0']) {
+      expect(fidelityOf(upp), upp).toEqual({ reduced: false, notes: [] });
+    }
+  });
+
+  it('names the positions it cannot honour, and only those', () => {
+    // Asserted as a set of positions rather than by regex on the prose. A badge
+    // checked by matching its own sentence stops testing anything the first
+    // time the sentence is edited — and the sentence is the part most likely to
+    // be edited.
+    const atmosphere = fidelityOf('C867A69-8');
+    expect(atmosphere.reduced).toBe(true);
+    expect(atmosphere.notes.map((n) => n.position)).toEqual(['Atmosphere', 'Hydrographics']);
+
+    const dry = fidelityOf('X860000-0');
+    expect(dry.notes.map((n) => n.position)).toEqual(['Atmosphere']);
+
+    const wet = fidelityOf('X107000-0');
+    expect(wet.notes.map((n) => n.position)).toEqual(['Hydrographics']);
+  });
+
+  it("reports the ruleset's own code and label, not a restatement", () => {
+    // The badge says what `cepheus-1` calls the code. If it said something of
+    // its own, the panel would disagree with the interpretation two rows below
+    // it in the same panel.
+    const [atmo] = fidelityOf('C867A69-8').notes;
+    expect(atmo?.code).toBe('6');
+    expect(atmo?.label).toBe(describeUpp(asUpp('C867A69-8'), CEPHEUS_1).positions[2]?.label);
+  });
+
+  it('says nothing about the four positions that are not physical', () => {
+    // Population, Government, Law Level and Tech Level are Phase 6 additions,
+    // not fidelity debts: the interpreter never reads them, so there is nothing
+    // about the planet the renderer is being wrong about. A badge listing them
+    // would be listing four positions that are fine.
+    const busy = fidelityOf('A100AAA-F');
+    expect(busy.reduced).toBe(false);
+  });
+
+  it('carries no note through the fixture route, which has no UPP to read', () => {
+    expect(chooseWorld(q('?fixture=size4-luna')).fidelity).toEqual({ reduced: false, notes: [] });
+  });
+
+  it('reaches the choice, so the panel does not have to recompute it', () => {
+    expect(chooseWorld(q('?upp=C867A69-8')).fidelity.reduced).toBe(true);
+    expect(chooseWorld(q('?upp=X100000-0')).fidelity.reduced).toBe(false);
   });
 });

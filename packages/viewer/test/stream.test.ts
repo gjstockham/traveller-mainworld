@@ -240,6 +240,7 @@ class FakeWorker {
       n: req.n,
       positions: new Float32Array(verts * 3),
       colours: new Float32Array(verts * 3),
+      normals: new Float32Array(verts * 3),
       minElevation: -100,
       maxElevation: 100,
       generateMs: 5,

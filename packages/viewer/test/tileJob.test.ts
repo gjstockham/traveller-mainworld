@@ -146,7 +146,11 @@ describe('runTileJob', () => {
     expect(response.tileId).toBe(REQUEST.tileId);
     expect(response.requestId).toBe(REQUEST.requestId);
     expect(response.n).toBe(N);
-    expect(transfer).toEqual([response.positions.buffer, response.colours.buffer]);
+    expect(transfer).toEqual([
+      response.positions.buffer,
+      response.colours.buffer,
+      response.normals.buffer,
+    ]);
   });
 
   it('produces elevations inside the world spec, unlike the stand-in', () => {

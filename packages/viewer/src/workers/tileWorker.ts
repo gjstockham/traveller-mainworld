@@ -14,6 +14,7 @@ import {
 } from '@traveller-mainworld/core';
 
 import { createTileGenerator } from '../kernel/choice.js';
+import { allocateNormalScratch } from '../mesh/tileNormals.js';
 import type { GenerateMessage, WorkerRequest, WorkerResponse } from '../stream/protocol.js';
 
 import { runTileJob } from './tileJob.js';
@@ -29,6 +30,8 @@ let generator: TileGenerator | undefined;
  * Float32 arrays cannot be pooled this way because they are transferred away.
  */
 const scratch = new Map<number, TileGenOutput>();
+/** Apron-position scratch for the normals, pooled for the same reason. */
+const normalScratch = new Map<number, Float64Array>();
 
 function scratchFor(n: number): TileGenOutput {
   let s = scratch.get(n);
@@ -39,12 +42,27 @@ function scratchFor(n: number): TileGenOutput {
   return s;
 }
 
+function normalScratchFor(n: number): Float64Array {
+  let s = normalScratch.get(n);
+  if (s === undefined) {
+    s = allocateNormalScratch(n);
+    normalScratch.set(n, s);
+  }
+  return s;
+}
+
 function handleGenerate(msg: GenerateMessage): void {
   if (world === undefined || generator === undefined) {
     throw new Error('worker received a generate request before init');
   }
 
-  const { response, transfer } = runTileJob(generator, world, msg, scratchFor(msg.n));
+  const { response, transfer } = runTileJob(
+    generator,
+    world,
+    msg,
+    scratchFor(msg.n),
+    normalScratchFor(msg.n),
+  );
 
   // Transfer, not copy. The arrays are detached here and owned by the main
   // thread on arrival.
@@ -59,6 +77,7 @@ onmessage = (event: MessageEvent<WorkerRequest>): void => {
         world = msg.world;
         generator = createTileGenerator(msg.genVersion);
         scratch.clear();
+        normalScratch.clear();
         break;
       case 'generate':
         handleGenerate(msg);

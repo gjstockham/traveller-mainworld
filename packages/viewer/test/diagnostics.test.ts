@@ -233,12 +233,15 @@ describe('PlanetRenderer buffer accounting', () => {
       n: N,
       positions: new Float32Array(verts * 3).fill(1),
       colours: new Float32Array(verts * 3),
+      normals: new Float32Array(verts * 3),
       minElevation: 0,
       maxElevation: 1,
     };
   };
   // Two Float32 attributes of three components each, per vertex.
-  const perMesh = vertexCount(N) * 3 * 4 * 2;
+  // Three Float32 attributes per vertex — position, colour and normal. The
+  // normal is WP12's; before it the multiplier was 2.
+  const perMesh = vertexCount(N) * 3 * 4 * 3;
 
   it('counts live meshes, and moves them to pooled rather than freeing them', () => {
     const planet = new PlanetRenderer({ n: N });

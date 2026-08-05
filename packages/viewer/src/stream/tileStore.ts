@@ -19,6 +19,8 @@ export interface ReadyTile {
   readonly n: number;
   readonly positions: Float32Array;
   readonly colours: Float32Array;
+  /** Smooth per-vertex normals, from the tile apron. See `mesh/tileNormals.ts`. */
+  readonly normals: Float32Array;
   readonly minElevation: number;
   readonly maxElevation: number;
 }
@@ -87,7 +89,7 @@ export class TileStore {
     this.cache = new TileCache<ReadyTile>(
       options.cacheCapacity ?? 512,
       undefined,
-      (tile) => tile.positions.byteLength + tile.colours.byteLength,
+      (tile) => tile.positions.byteLength + tile.colours.byteLength + tile.normals.byteLength,
     );
 
     const count = options.workerCount ?? defaultWorkerCount();
@@ -244,13 +246,15 @@ export class TileStore {
       n: msg.n,
       positions: msg.positions,
       colours: msg.colours,
+      normals: msg.normals,
       minElevation: msg.minElevation,
       maxElevation: msg.maxElevation,
     };
 
     this.generated++;
     this.totalGenerateMs += msg.generateMs;
-    this.bytesTransferred += msg.positions.byteLength + msg.colours.byteLength;
+    this.bytesTransferred +=
+      msg.positions.byteLength + msg.colours.byteLength + msg.normals.byteLength;
 
     this.cache.set(msg.tileId, this.options.genVersion, tile);
     this.ready.push(tile);

@@ -324,6 +324,12 @@ export class DiagnosticsOverlay {
     ].join(';');
 
     this.element = document.createElement('pre');
+    // Named, because WP12 put a second `pre` and several more buttons on the
+    // page. Every selector that reads this panel — the Playwright specs, and
+    // anyone reading a session block off it — has to find *this* element, and a
+    // structural locator stopped being unambiguous the moment the input UI
+    // landed.
+    this.element.setAttribute('data-role', 'diagnostics');
     this.element.style.cssText = [
       'margin:0',
       'padding:8px 10px',
@@ -337,6 +343,7 @@ export class DiagnosticsOverlay {
 
     this.button = document.createElement('button');
     this.button.type = 'button';
+    this.button.setAttribute('data-role', 'copy-evidence');
     this.button.textContent = 'Copy evidence';
     this.button.style.cssText = [
       'pointer-events:auto',

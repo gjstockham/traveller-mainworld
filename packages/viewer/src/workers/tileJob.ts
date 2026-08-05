@@ -11,6 +11,7 @@
 import { type TileGenOutput, type TileGenerator, type World, worldPalette } from '@traveller-mainworld/core';
 
 import { buildTileColours, buildTilePositions, vertexCount } from '../mesh/tileMesh.js';
+import { allocateNormalScratch, buildTileNormals } from '../mesh/tileNormals.js';
 import type { GenerateMessage, TileReadyMessage } from '../stream/protocol.js';
 
 export interface TileJobResult {
@@ -30,12 +31,16 @@ export interface TileJobResult {
  *
  * @param scratch Caller-owned buffers for the raw kernel output, pooled by the
  *                worker across requests. Must match `msg.n`.
+ * @param normalScratch Caller-owned apron-position scratch, likewise pooled.
+ *                Optional so the tests that exercise the kernel seam do not
+ *                each have to carry one; production always passes it.
  */
 export function runTileJob(
   generator: TileGenerator,
   world: World,
   msg: GenerateMessage,
   scratch: TileGenOutput,
+  normalScratch: Float64Array = allocateNormalScratch(msg.n),
 ): TileJobResult {
   const started = performance.now();
   const tile = generator.generate(msg.tileId, world, msg.n, scratch);
@@ -43,6 +48,7 @@ export function runTileJob(
   const verts = vertexCount(msg.n);
   const positions = new Float32Array(verts * 3);
   const colours = new Float32Array(verts * 3);
+  const normals = new Float32Array(verts * 3);
 
   buildTilePositions(
     tile.directions,
@@ -66,6 +72,16 @@ export function runTileJob(
     msg.n,
     colours,
   );
+  // The apron's only consumer. It never leaves the worker: `(n+3)²` doubles is
+  // larger than all three Float32 buffers together, and the normals are what
+  // the renderer actually wants.
+  buildTileNormals(
+    msg.tileId,
+    tile.apronElevation,
+    { n: msg.n, radius: msg.radius, elevationScale: msg.elevationScale },
+    normalScratch,
+    normals,
+  );
 
   let minElevation = Infinity;
   let maxElevation = -Infinity;
@@ -84,10 +100,11 @@ export function runTileJob(
       n: msg.n,
       positions,
       colours,
+      normals,
       minElevation,
       maxElevation,
       generateMs: performance.now() - started,
     },
-    transfer: [positions.buffer, colours.buffer],
+    transfer: [positions.buffer, colours.buffer, normals.buffer],
   };
 }

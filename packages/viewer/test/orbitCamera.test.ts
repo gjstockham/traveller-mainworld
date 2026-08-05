@@ -219,4 +219,61 @@ describe('initial framing', () => {
     expect(clamped.altitudeAboveSurface).toBeLessThan(initialAltitude);
     expect(raised.altitudeAboveSurface).toBeCloseTo(initialAltitude, 6);
   });
+
+  it('reframes for a new world without pulling the camera back to the old bound', () => {
+    // WP12 applies a UPP in place rather than reloading, so one camera outlives
+    // several worlds. The retreat bound is per-world — a Size 1 rockball frames
+    // at 18.75 radii and a Size A world at 1.875 — so a `reframe` that moved the
+    // altitude and left the bound behind would clamp the small world straight
+    // back to a framing that hides its size, which is the exact failure the
+    // absolute altitude exists to prevent.
+    const camera = new OrbitCamera({ ...DEFAULT_ORBIT, initialAltitude: 15_000 / 8000 });
+    camera.reframe(15_000 / 800);
+    camera.update(1 / 60);
+    expect(camera.altitudeAboveSurface).toBeCloseTo(15_000 / 800, 6);
+
+    // And back the other way, which is the direction that would pass anyway if
+    // the bound were never raised.
+    camera.reframe(15_000 / 8000);
+    camera.update(1 / 60);
+    expect(camera.altitudeAboveSurface).toBeCloseTo(15_000 / 8000, 6);
+  });
+
+  it('keeps its orientation across a reframe', () => {
+    // Applying a UPP changes the world under the camera, not the direction it
+    // is looking from. Resetting the azimuth on every re-roll would make U4 —
+    // auditioning seeds against each other — harder than it needs to be.
+    const camera = new OrbitCamera({ ...DEFAULT_ORBIT });
+    camera.setPose(123, 34, 5);
+    const before = camera.orientationDeg;
+    camera.reframe(2);
+    expect(camera.orientationDeg).toEqual(before);
+  });
+
+  it('round-trips a pose through the degrees the share URL uses', () => {
+    const camera = new OrbitCamera({ ...DEFAULT_ORBIT });
+    camera.setPose(-45, 30, 3);
+    const { azimuthDeg, elevationDeg } = camera.orientationDeg;
+    expect(azimuthDeg).toBeCloseTo(-45, 9);
+    expect(elevationDeg).toBeCloseTo(30, 9);
+    expect(camera.altitudeAboveSurface).toBeCloseTo(3, 9);
+  });
+
+  it('clamps a pose that asks for the pole or the inside of the planet', () => {
+    // A `?cam=` naming an altitude below the surface should land at closest
+    // approach rather than inside the terrain, and the latitude clamp is the
+    // same gimbal guard a drag gets.
+    const camera = new OrbitCamera({ ...DEFAULT_ORBIT });
+    camera.setPose(0, 90, 1e-9);
+    expect(camera.orientationDeg.elevationDeg).toBeLessThan(90);
+    expect(camera.altitudeAboveSurface).toBeCloseTo(DEFAULT_ORBIT.minAltitude, 9);
+  });
+
+  it('stops moving when a pose is set, so a shared link opens still', () => {
+    const camera = new OrbitCamera({ ...DEFAULT_ORBIT });
+    camera.drag(200, 60);
+    expect(camera.isMoving).toBe(true);
+    camera.setPose(10, 10, 2);
+    expect(camera.isMoving).toBe(false);
+  });
 });

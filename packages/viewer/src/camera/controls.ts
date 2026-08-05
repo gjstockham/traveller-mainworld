@@ -10,11 +10,27 @@ export interface ControlsHandle {
   dispose(): void;
 }
 
+export interface ControlsOptions {
+  /**
+   * Reframe the current world — the `Home` key.
+   *
+   * A keyboard user who zooms past the surface has no equivalent of throwing
+   * the mouse wheel, and PRD R18's "keyboard fallbacks" is not satisfied by
+   * controls that can reach a state they cannot leave. Owned by the caller
+   * because only it knows the world's radius, which is what "framed" means.
+   */
+  readonly onReframe?: () => void;
+}
+
 /** Keyboard step sizes, chosen to feel like a short drag / one wheel notch. */
 const KEY_DRAG_PIXELS = 40;
 const KEY_ZOOM_NOTCHES = 1;
 
-export function bindControls(element: HTMLElement, camera: OrbitCamera): ControlsHandle {
+export function bindControls(
+  element: HTMLElement,
+  camera: OrbitCamera,
+  options: ControlsOptions = {},
+): ControlsHandle {
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
@@ -82,6 +98,9 @@ export function bindControls(element: HTMLElement, camera: OrbitCamera): Control
       case '-':
       case '_':
         camera.zoom(KEY_ZOOM_NOTCHES);
+        break;
+      case 'Home':
+        options.onReframe?.();
         break;
       default:
         return;

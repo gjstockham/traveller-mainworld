@@ -12,6 +12,8 @@ import * as THREE from 'three';
 import { buildTileIndices, vertexCount } from '../mesh/tileMesh.js';
 import type { ReadyTile } from '../stream/tileStore.js';
 
+import { DEFAULT_SUN, type SunDirection, sunVector } from './sun.js';
+
 export interface PlanetRendererOptions {
   readonly n: number;
   /** Maximum retired meshes kept for reuse. */
@@ -75,10 +77,13 @@ export class PlanetRenderer {
 
     this.material = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      // Flat shading is the Phase 0 look, and it comes free: Three derives the
-      // facet normal in the fragment shader, so no normal attribute is needed
-      // and none is computed or transferred.
-      flatShading: true,
+      // Smooth shading from the apron-derived normal attribute (WP12). Flat
+      // shading was free — Three derives the facet normal in the fragment
+      // shader — and it was right for a Phase 0 noise sphere. It is wrong for
+      // craters: a 65² tile flat-shades a rim into facets, and a rim's whole
+      // character is a curve. See `mesh/tileNormals.ts` for what the normals
+      // cost and what they guarantee at a tile boundary.
+      flatShading: false,
       roughness: 1,
       metalness: 0,
       side: THREE.FrontSide,
@@ -121,7 +126,11 @@ export class PlanetRenderer {
     for (const attribute of this.indexAttributes) {
       shared += (attribute.array as ArrayBufferView).byteLength;
     }
-    const perMesh = vertexCount(this.options.n) * 3 * Float32Array.BYTES_PER_ELEMENT * 2;
+    // Three attributes now — position, colour and normal — so the multiplier is
+    // 3 rather than the 2 it was before WP12. It is spelled out because the
+    // Spike C memory criterion is read off this number and a stale constant
+    // would understate every mesh by a third.
+    const perMesh = vertexCount(this.options.n) * 3 * Float32Array.BYTES_PER_ELEMENT * 3;
     return { live: this.live.size * perMesh, pooled: this.pool.length * perMesh, shared };
   }
 
@@ -149,11 +158,14 @@ export class PlanetRenderer {
     const geometry = mesh.geometry;
     const position = geometry.getAttribute('position') as THREE.BufferAttribute;
     const colour = geometry.getAttribute('color') as THREE.BufferAttribute;
+    const normal = geometry.getAttribute('normal') as THREE.BufferAttribute;
 
     (position.array as Float32Array).set(tile.positions);
     (colour.array as Float32Array).set(tile.colours);
+    (normal.array as Float32Array).set(tile.normals);
     position.needsUpdate = true;
     colour.needsUpdate = true;
+    normal.needsUpdate = true;
 
     // Needed for frustum culling to work; without it Three draws every tile
     // regardless of where the camera is looking.
@@ -216,6 +228,10 @@ export class PlanetRenderer {
       }
     }
     geometry.setAttribute('color', new THREE.BufferAttribute(colours, 3));
+    // Filled by `upsert` from the tile's own normals. Left zeroed until then,
+    // which is the same state the position and colour attributes start in — a
+    // mesh is never in the scene before `upsert` has written all three.
+    geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(verts * 3), 3));
     // Shared across every tile with the same skirt mask, so at most sixteen
     // index buffers exist on the GPU regardless of tile count.
     geometry.setIndex(this.indexAttributes[0b1111]!);
@@ -224,12 +240,33 @@ export class PlanetRenderer {
 }
 
 /**
+ * Ambient fill, and why it is not zero.
+ *
+ * PRD R19 says "none" for a vacuum world and it means it: there is no
+ * atmosphere to scatter light into a shadow, so the physically correct night
+ * side is black and the physically correct crater floor at low sun is black
+ * too. What is left here is a hundredth of the sun, which is not a lighting
+ * choice — it is the difference between a tile that is unlit and a tile that
+ * never arrived, and without it the streaming viewer has no way to show one.
+ *
+ * It is deliberately below the level at which it fills a shadow: at 0.03
+ * against a sun of 3.0 a shadowed slope reads as 1% of a lit one, which on an
+ * 8-bit display is two or three values above black. Raising it is how the stark
+ * vacuum look gets quietly thrown away, one tenth at a time — WP11 built a real
+ * albedo field precisely so that the terminator and the self-shading could
+ * carry the picture.
+ */
+const AMBIENT_INTENSITY = 0.03;
+
+/** Sun intensity. Unchanged from Phase 0; the ambient is what WP12 moved. */
+const SUN_INTENSITY = 3.0;
+
+/**
  * Scene, camera, renderer and lighting for an airless world.
  *
- * One directional light and almost no ambient: a vacuum world has no
- * atmospheric scattering to fill its shadows, so the terminator is hard and
- * the night side is essentially black. The small ambient term is a concession
- * to being able to see what one is debugging.
+ * One directional light, ambient at {@link AMBIENT_INTENSITY}, and no shadow
+ * maps — see `render/sun.ts` for why the last of those is a phase of its own
+ * rather than an omission.
  */
 export function createScene(
   canvas: HTMLCanvasElement,
@@ -255,10 +292,26 @@ export function createScene(
 
   const camera = new THREE.PerspectiveCamera(50, 1, 1e-4, 100);
 
-  const sun = new THREE.DirectionalLight(0xfff4e8, 3.0);
-  sun.position.set(1, 0.35, 0.6).normalize();
+  const sun = new THREE.DirectionalLight(0xfff4e8, SUN_INTENSITY);
+  const initial = sunVector(DEFAULT_SUN);
+  sun.position.set(initial.x, initial.y, initial.z);
   scene.add(sun);
-  scene.add(new THREE.AmbientLight(0x2a3244, 0.35));
+  scene.add(new THREE.AmbientLight(0x2a3244, AMBIENT_INTENSITY));
 
   return { scene, camera, renderer, sun };
+}
+
+/**
+ * Point the sun, keeping it fixed relative to the *world* rather than the
+ * camera, so the terminator stays put as the camera orbits.
+ *
+ * A directional light in Three shines from its position toward its target, and
+ * both have to be in the scene graph for the target to be updated — which is
+ * the trap this function exists to stop anyone re-discovering.
+ */
+export function aimSun(sun: THREE.DirectionalLight, dir: SunDirection): void {
+  const v = sunVector(dir);
+  sun.position.set(v.x, v.y, v.z);
+  sun.target.position.set(0, 0, 0);
+  sun.target.updateMatrixWorld();
 }
