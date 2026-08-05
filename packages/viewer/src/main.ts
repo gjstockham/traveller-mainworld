@@ -117,7 +117,7 @@ function main(): void {
   // frame rate of the shipped view.
   const overlay = new DiagnosticsOverlay(app, {
     world: label,
-    worldShort: choice.fixtureId ?? 'default world',
+    worldShort: choice.short,
     build: BUILD_COMMIT,
     tileN: TILE_N,
     exaggeration,

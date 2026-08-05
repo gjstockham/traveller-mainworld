@@ -78,9 +78,9 @@ with whether ADR-0001's R4 performance trigger fires and Phase 1 open question 1
 (65² vs 129²), which the gap between those two rows now bears directly on. Until
 then the model stays where it is and should not be quoted as a Phase 1 figure.
 
-The viewer takes `?seed=<text>` to change world, `?debug=1` to preserve the WebGL
-drawing buffer so pixels can be read back, and `?fixture=<id>` to fly one of the
-ten golden fixture worlds:
+The viewer takes `?upp=<string>` to fly a real UPP, `?seed=<text>` to change
+world, `?debug=1` to preserve the WebGL drawing buffer so pixels can be read
+back, and `?fixture=<id>` to fly one of the ten golden fixture worlds:
 
 ```
 ?fixture=size1-rockball   size2-cinder     size3-ceres      size4-luna
@@ -97,6 +97,24 @@ specs live in `core`, not in the harness, so what you fly is what is hashed
 rather than a copy that could drift. An unknown id is refused with the list
 rather than silently falling back to the default world, and `?seed=` is refused
 alongside `?fixture=` because a fixture's seed is part of what is pinned.
+
+**`?upp=` is the only route that shows a world the interpreter actually
+produced.** Every fixture overrides the fBm parameters after interpreting —
+deliberately, since the set exists to discriminate — and the default world
+overrides radius, relief and fBm too, so `cepheus-1`'s own `fbmFrequency` and
+`fbmOctaves` columns had never been rendered once. `?upp=` overrides nothing, and
+combines with `?seed=`:
+
+```
+?upp=F20076C-F            Luna, as the Traveller wiki writes it
+?upp=H30016A-F&seed=7     Callisto, re-rolled
+?upp=C867A69-8            an ordinary mainworld
+```
+
+It is a slice of WP12, not WP12: there is no input UI, no info panel, no
+reduced-fidelity badge and no `gen`/`ruleset` parameters yet. A malformed UPP is
+refused with the parser's own message, which names the offending position, and
+Size 0 is refused with the §3 reason rather than rendered as a broken planet.
 
 Every world is framed from the **same absolute altitude** (15 000 km), not the
 same multiple of its own radius, so apparent size tracks real size: a Size 1

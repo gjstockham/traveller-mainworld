@@ -1,4 +1,4 @@
-import { FIXTURES } from '@traveller-mainworld/core';
+import { FIXTURES, interpretText } from '@traveller-mainworld/core';
 import { describe, expect, it } from 'vitest';
 
 import { chooseWorld, defaultWorld, fixtureIds } from '../src/world/choice.js';
@@ -72,5 +72,64 @@ describe('chooseWorld', () => {
       (f) => f.world.spec.terrainAmplitudeM / (f.world.spec.radiusKm * 1000),
     );
     expect(Math.max(...ratios) / Math.min(...ratios)).toBeGreaterThan(5);
+  });
+});
+
+describe('?upp=', () => {
+  const at = (query: string): ReturnType<typeof chooseWorld> =>
+    chooseWorld(new URLSearchParams(query));
+
+  it('renders a world from the interpreter, overriding nothing', () => {
+    // The point of the route. Every fixture overrides fBm and the default world
+    // overrides radius, relief and fBm too, so this is the only path on which
+    // cepheus-1's Size table is seen as it actually is.
+    const choice = at('upp=X400000-0');
+    const spec = interpretText('X400000-0');
+    expect(choice.world.spec).toEqual(spec);
+    expect(choice.fixtureId).toBeUndefined();
+    expect(choice.label).toContain('X400000-0');
+  });
+
+  it('takes a seed, and different seeds give different worlds', () => {
+    const a = at('upp=X400000-0&seed=alpha').world;
+    const b = at('upp=X400000-0&seed=beta').world;
+    expect([a.seedHi, a.seedLo]).not.toEqual([b.seedHi, b.seedLo]);
+    // Same world, different instance of it: the spec must not vary with seed.
+    expect(a.spec).toEqual(b.spec);
+  });
+
+  it('accepts the extended spaceport classes, so real system bodies fly', () => {
+    // Luna and Callisto as the Traveller wiki writes them. This is what the
+    // spaceport work was for; if the parser narrows again, this says so.
+    expect(at('upp=F20076C-F').world.spec.radiusKm).toBe(1600);
+    expect(at('upp=H30016A-F').world.spec.radiusKm).toBe(2400);
+  });
+
+  it('refuses Size 0 with the reason, not a broken planet', () => {
+    // PRD §3: a belt is a system-level feature, not a body. The parser accepts
+    // Size 0 and the interpreter is total over it, both deliberately — enforcing
+    // product scope is the app's job and this is the app.
+    expect(() => at('upp=X000000-0')).toThrow(/Size 0/);
+    expect(() => at('upp=X000000-0')).toThrow(/belt/);
+  });
+
+  it('surfaces the parser message, which names the offending position', () => {
+    expect(() => at('upp=Z867A69-8')).toThrow(/Position 1 \(Starport\)/);
+    expect(() => at('upp=X8Z7A69-8')).toThrow(/Position 3 \(Atmosphere\)/);
+  });
+
+  it('refuses to be combined with ?fixture=', () => {
+    // Two different worlds asked for at once. Silently picking one is how you
+    // convince yourself you looked at something you did not.
+    expect(() => at('upp=X400000-0&fixture=size4-luna')).toThrow(/cannot be combined/);
+  });
+
+  it('names itself in the overlay stamp rather than claiming to be the default', () => {
+    // The stamp is what ties a recorded observation to what was on screen.
+    // Deriving it from `fixtureId` worked with two routes and mislabelled every
+    // UPP world the moment there were three.
+    expect(at('upp=X400000-0').short).toBe('X400000-0');
+    expect(at('fixture=size4-luna').short).toBe('size4-luna');
+    expect(at('').short).toBe('default world');
   });
 });

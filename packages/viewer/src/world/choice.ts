@@ -1,11 +1,27 @@
 /**
  * Which world the viewer renders.
  *
- * Two routes, and the second is the point of this module:
+ * Three routes:
  *
  * - `?seed=<text>` — the Phase 0 stand-in, a Luna-ish airless rockball, with the
  *   seed hashed to 64 bits. What the viewer has always done.
  * - `?fixture=<id>` — one of the ten golden fixture worlds from `core`.
+ * - `?upp=<string>` — **a real UPP, interpreted.** Combines with `?seed=`.
+ *
+ * ## What `?upp=` is, and what it is not
+ *
+ * It is not WP12. There is no input UI, no info panel, no reduced-fidelity
+ * badge, and no `gen`/`ruleset` parameters — R27's share URL is four parameters
+ * and this is two of them. What it is: the only way to look at a world the
+ * interpreter actually produced, which until now was impossible.
+ *
+ * **That gap was wider than it sounds.** Every fixture overrides the fBm
+ * parameters after interpreting — deliberately, because the set exists to
+ * discriminate and a smooth per-Size curve would hash ten worlds differing only
+ * in radius and seed. The default world overrides radius, relief *and* fBm. So
+ * no one has ever seen a world built purely from `cepheus-1`'s own numbers, and
+ * the Size table's `fbmFrequency` and `fbmOctaves` columns have never been
+ * looked at once. This route is where they finally get seen.
  *
  * The fixtures were hashed by WP7 and never once looked at. That is a real gap:
  * a fixture with a degenerate spec — relief so large the displaced surface
@@ -30,12 +46,25 @@ import {
   FIXTURES,
   type World,
   hashSeedString,
+  interpret,
   interpretText,
+  isUppError,
+  parseUpp,
 } from '@traveller-mainworld/core';
 
 export interface WorldChoice {
   /** Shown in the title bar and the diagnostics overlay. */
   readonly label: string;
+  /**
+   * A few characters naming this world, for the overlay's evidence stamp.
+   *
+   * Every route supplies one. Deriving it from `fixtureId` at the call site
+   * worked while there were two routes and silently mislabelled a UPP world as
+   * "default world" the moment there were three — and the stamp is what ties a
+   * recorded observation to what was on screen, so a wrong one is worse than a
+   * vague one.
+   */
+  readonly short: string;
   /** Fixture id, when this world came from the golden set. */
   readonly fixtureId: string | undefined;
   readonly world: World;
@@ -46,6 +75,7 @@ export function defaultWorld(seedText: string): WorldChoice {
   const seed = hashSeedString(seedText);
   return {
     label: `Size 8 airless rockball / seed ${seedText}`,
+    short: 'default world',
     fixtureId: undefined,
     world: {
       spec: {
@@ -66,12 +96,67 @@ export function fixtureIds(): string[] {
 }
 
 /**
+ * A world from a UPP, exactly as `cepheus-1` interprets it.
+ *
+ * Nothing is overridden. Radius, relief and both fBm columns come from the Size
+ * table, which is the whole point — see the module header.
+ *
+ * **Size 0 is refused here rather than downstream.** PRD §3 makes belts a
+ * permanent non-goal: a belt is a system-level feature, not a body, and would
+ * need a generator of its own. `parseUpp` accepts Size 0 by design and
+ * `interpret` is total over it by design, because product scope is neither the
+ * parser's job nor the interpreter's. It is the app's, and this is the app.
+ */
+export function uppWorld(text: string, seedText: string): WorldChoice {
+  const parsed = parseUpp(text);
+  if (isUppError(parsed)) {
+    // The parser's message already names the offending position, which is what
+    // R1 asks for; prefixing it would only bury that.
+    throw new Error(parsed.message);
+  }
+
+  if (parsed.size === 0) {
+    throw new Error(
+      `${parsed.canonical} is Size 0 — an asteroid or planetoid belt, not a single ` +
+        'body. Belts are out of scope for this tool (PRD §3): they are a system-level ' +
+        'feature and would need a generator of their own. Try Size 1 or above.',
+    );
+  }
+
+  const seed = hashSeedString(seedText);
+  const spec = interpret(parsed);
+  return {
+    label:
+      `${parsed.canonical} — ${String(spec.radiusKm)} km radius, ` +
+      `${String(spec.terrainAmplitudeM)} m relief, ${String(spec.fbm.octaves)} octaves / ` +
+      `seed ${seedText}`,
+    short: parsed.canonical,
+    fixtureId: undefined,
+    world: { spec, seedHi: seed[0]!, seedLo: seed[1]! },
+  };
+}
+
+/**
  * Resolve the world from a query string.
  *
  * @throws if `fixture` names an id that does not exist.
  */
 export function chooseWorld(params: URLSearchParams): WorldChoice {
   const fixtureId = params.get('fixture');
+  const uppText = params.get('upp');
+
+  if (fixtureId !== null && uppText !== null) {
+    // Same reasoning as `?fixture=` refusing `?seed=`: a fixture is a pinned
+    // spec, and a UPP is a request to interpret one. Asking for both is asking
+    // for two different worlds, and picking one silently would leave someone
+    // believing they had rendered the other.
+    throw new Error(`?upp= cannot be combined with ?fixture=${fixtureId}. Drop one.`);
+  }
+
+  if (uppText !== null) {
+    return uppWorld(uppText, params.get('seed') ?? '42');
+  }
+
   if (fixtureId === null) {
     return defaultWorld(params.get('seed') ?? '42');
   }
@@ -98,6 +183,7 @@ export function chooseWorld(params: URLSearchParams): WorldChoice {
     label:
       `fixture ${fixture.id} — ${String(radiusKm)} km radius, ` +
       `${String(terrainAmplitudeM)} m relief, ${String(fbm.octaves)} octaves`,
+    short: fixture.id,
     fixtureId: fixture.id,
     // The fixture's own `World`, not a copy: this must be the object the golden
     // manifest hashes, or "I rendered a fixture" stops meaning anything.

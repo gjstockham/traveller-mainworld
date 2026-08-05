@@ -30,6 +30,45 @@ above is the copy that is, and the README repeats it.
 
 ---
 
+## Unreleased — `?upp=` in the viewer
+
+**No identity moved.** This is viewer routing: which world gets asked for, never
+what a tile contains.
+
+- **`?upp=<string>` renders a real UPP**, combining with `?seed=`. It is a slice
+  of WP12's D8, not WP12 — no input UI, no info panel, no reduced-fidelity badge,
+  and no `gen`/`ruleset` parameters, so R27's four-parameter share URL is still
+  ahead. What it unblocks is looking at the bodies the spaceport work made
+  readable: `?upp=F20076C-F` is Luna as the Traveller wiki writes it.
+
+- **It is the only route that shows a world the interpreter actually produced.**
+  Every fixture overrides the fBm parameters after interpreting — deliberately,
+  because the set exists to discriminate and a smooth per-Size curve would hash
+  ten worlds differing only in radius and seed — and the default world overrides
+  radius, relief *and* fBm. So `cepheus-1`'s `fbmFrequency` and `fbmOctaves`
+  columns had never been rendered once, on any route, since they were written.
+
+- **A false alarm, checked rather than left as a worry.** Those columns hand out
+  a base frequency of exactly 1.0 at Size 2 and 2.0 at Size 7, and `noise.ts`
+  warns in terms to keep base frequencies non-dyadic — on a regular grid, a
+  power-of-two frequency can land first-octave samples on the half-lattice, where
+  the fade weights collapse and the output is drawn from about fourteen distinct
+  values. Measured across all ten sizes with craters off: every one produces
+  16 641 distinct elevations from 16 641 samples. The warning is about *regular*
+  grids, and sample positions here go through the tangent warp and a
+  normalisation before they reach the noise, so they never form one. No banding,
+  and no reason for a future `cepheus-2` to avoid those two values.
+
+- **Size 0 is refused by the app, with the reason.** `parseUpp` accepts it and
+  `interpret` is total over it, both deliberately — enforcing product scope is
+  neither the parser's job nor the interpreter's. PRD §3 makes belts a permanent
+  non-goal, and the message says so instead of rendering a 400 km sphere.
+
+- `WorldChoice` gained a `short` field for the diagnostics stamp. The overlay
+  derived it from `fixtureId`, which worked with two routes and silently
+  mislabelled every UPP world as "default world" the moment there were three —
+  and that stamp is what ties a recorded observation to what was on screen.
+
 ## Unreleased — spaceport classes
 
 **No identity moved and none should have.** The interpreter reads Size,
