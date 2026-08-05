@@ -2,9 +2,15 @@
  * Cepheus Engine — plain-English interpretation of every position (Phase 1
  * plan §4.4, feeding PRD R21).
  *
- * **OPEN GAME CONTENT.** The meanings below are derived from the Cepheus
- * Engine System Reference Document and are used under the Open Game License
- * 1.0a. See `LICENSE-OGL.txt`.
+ * **OPEN GAME CONTENT, with one marked exception.** The meanings below are
+ * derived from the Cepheus Engine System Reference Document and are used under
+ * the Open Game License 1.0a. See `LICENSE-OGL.txt`.
+ *
+ * The exception is the block of **spaceport** classes (`F`, `G`, `H`, `Y`) in
+ * the starport table. Those codes are not in the Cepheus SRD — they are
+ * Traveller's extended set for non-mainworld system bodies — and the wording is
+ * original to this project. The boundary is marked at the line, not left to
+ * this paragraph.
  *
  * ## Why this covers all eight positions and not digits 2–4
  *
@@ -54,6 +60,38 @@ const STARPORT: Record<StarportClass, ProseEntry> = {
   X: {
     label: 'None',
     text: 'No starport. Usually a hazard-marked or interdicted zone; a landing here is unsupervised and on your own account.',
+  },
+
+  // --- spaceport classes -----------------------------------------------------
+  //
+  // **NOT OPEN GAME CONTENT.** Everything above this line is derived from the
+  // Cepheus Engine SRD and is covered by the OGL notice in this file's header.
+  // The four classes below are not in that SRD: they are the extended
+  // *spaceport* codes Traveller uses for the bodies in a system that are not
+  // the mainworld, and the wording is original to this project rather than
+  // reproduced from anywhere. They are separated here, rather than merged into
+  // the block above, so the licence boundary inside the file stays visible —
+  // the same treatment the Size and Atmosphere tables give their non-rules
+  // columns.
+  //
+  // A spaceport is not a small starport. It serves in-system traffic, so the
+  // grading is about what a ship arriving from elsewhere in the same system can
+  // expect, and the prose says "spaceport" throughout for that reason.
+  F: {
+    label: 'Good spaceport',
+    text: 'A working in-system facility: unrefined fuel, a hard landing surface, and enough of a crew to turn a ship around.',
+  },
+  G: {
+    label: 'Poor spaceport',
+    text: 'A cleared and maintained landing area with minimal support. Fuel is not assured.',
+  },
+  H: {
+    label: 'Primitive spaceport',
+    text: 'A landing area and little else — improvised, intermittently staffed, and no better than the ground it sits on.',
+  },
+  Y: {
+    label: 'No spaceport',
+    text: 'Nothing here. No facility, no marked ground, no traffic. A landing is entirely on your own account.',
   },
 };
 

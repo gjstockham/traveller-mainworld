@@ -22,17 +22,21 @@
  * surface descriptions are IAU figures and published observation, not from the
  * wiki.
  *
- * The **starport class is substituted**. The wiki uses the extended system
- * spaceport codes (F, G, H, Y) for non-mainworld bodies, and `parseUpp` accepts
- * only A–E and X — which is arguably right for a product called Mainworld, and
- * is a live question rather than a settled one. Nothing is lost by substituting:
- * `interpret` reads Size, Atmosphere and Hydrographics and nothing else, so the
- * starport reaches no physical field. Three bodies cannot be represented at all
- * (Phobos, Enceladus and Umbriel are Size `S`, below the table's Size 0) and are
- * left out; they are under the "potato radius" the PRD §8.3 defers anyway.
+ * The UPPs are **verbatim**, including the extended spaceport codes (F, G, H,
+ * Y) the wiki uses for non-mainworld bodies. They were not, at first: the parser
+ * accepted only A–E and X, so eleven of the twelve were rejected and this file
+ * substituted an `X` to get at the physics. Being unable to read the only
+ * real-world data available to check the ruleset against is what argued the
+ * spaceport classes in, and the substitution is gone.
+ *
+ * Three bodies still cannot be represented: Phobos, Enceladus and Umbriel are
+ * Size `S`, below the table's Size 0. They are under the "potato radius" PRD
+ * §8.3 defers, so they are left out rather than approximated.
  */
 import { describe, expect, it } from 'vitest';
 
+import { isUppError, parseUpp, portKind } from '../src/input/upp.js';
+import { describeUpp } from '../src/ruleset/describe.js';
 import { interpretText } from '../src/ruleset/interpret.js';
 
 /** How much of its impact record a body has actually kept. */
@@ -40,7 +44,7 @@ type Record_ = 'saturated' | 'moderate' | 'sparse';
 
 interface Body {
   readonly name: string;
-  /** Wiki UPP with the starport substituted; see the file header. */
+  /** The wiki's UPP, verbatim. */
   readonly upp: string;
   /** IAU mean radius, km. */
   readonly radiusKm: number;
@@ -50,31 +54,68 @@ interface Body {
 }
 
 const BODIES: readonly Body[] = [
-  { name: 'Mercury', upp: 'X30046A-E', radiusKm: 2440, record: 'saturated',
+  { name: 'Mercury', upp: 'G30046A-E', radiusKm: 2440, record: 'saturated',
     observed: 'heavily cratered, close to lunar highlands; Caloris 1550 km' },
-  { name: 'Venus', upp: 'X8B0168-E', radiusKm: 6052, record: 'sparse',
+  { name: 'Venus', upp: 'G8B0168-E', radiusKm: 6052, record: 'sparse',
     observed: 'globally resurfaced ~500 Ma; ~1000 craters, all young' },
-  { name: 'Terra', upp: 'X867A69-F', radiusKm: 6371, record: 'sparse',
+  { name: 'Terra', upp: 'A867A69-F', radiusKm: 6371, record: 'sparse',
     observed: 'almost nothing survives erosion, tectonics and ocean' },
-  { name: 'Luna', upp: 'X20076C-F', radiusKm: 1737, record: 'saturated',
+  { name: 'Luna', upp: 'F20076C-F', radiusKm: 1737, record: 'saturated',
     observed: 'saturated highlands plus resurfaced maria; 5185 craters >= 20 km' },
-  { name: 'Mars', upp: 'X43056A-F', radiusKm: 3390, record: 'moderate',
+  { name: 'Mars', upp: 'F43056A-F', radiusKm: 3390, record: 'moderate',
     observed: 'southern highlands saturated, northern lowlands resurfaced' },
-  { name: 'Ganymede', upp: 'X300468-F', radiusKm: 2634, record: 'moderate',
+  { name: 'Ganymede', upp: 'F300468-F', radiusKm: 2634, record: 'moderate',
     observed: '~40% dark cratered terrain, ~60% young grooved terrain' },
-  { name: 'Callisto', upp: 'X30016A-F', radiusKm: 2410, record: 'saturated',
+  { name: 'Callisto', upp: 'H30016A-F', radiusKm: 2410, record: 'saturated',
     observed: 'the most heavily cratered body known; fully saturated' },
-  { name: 'Rhea', upp: 'X100468-E', radiusKm: 764, record: 'saturated',
+  { name: 'Rhea', upp: 'H100468-E', radiusKm: 764, record: 'saturated',
     observed: 'heavily cratered, close to saturation' },
-  { name: 'Titan', upp: 'X3A0168-E', radiusKm: 2575, record: 'sparse',
+  { name: 'Titan', upp: 'H3A0168-E', radiusKm: 2575, record: 'sparse',
     observed: 'very few craters: thick atmosphere plus resurfacing' },
-  { name: 'Titania', upp: 'X100168-E', radiusKm: 789, record: 'moderate',
+  { name: 'Titania', upp: 'H100168-E', radiusKm: 789, record: 'moderate',
     observed: 'moderately cratered, some resurfacing' },
-  { name: 'Triton', upp: 'X210169-E', radiusKm: 1353, record: 'sparse',
+  { name: 'Triton', upp: 'H210169-E', radiusKm: 1353, record: 'sparse',
     observed: 'one of the youngest surfaces known; cryovolcanic, almost no craters' },
-  { name: 'Pluto', upp: 'X10046C-F', radiusKm: 1188, record: 'moderate',
+  { name: 'Pluto', upp: 'F10046C-F', radiusKm: 1188, record: 'moderate',
     observed: 'mixed: Sputnik Planitia crater-free, elsewhere cratered' },
 ];
+
+describe('the real UPPs parse as written', () => {
+  it('ACCEPTS EVERY BODY WITHOUT EDITING ITS CODE', () => {
+    // The reason the spaceport classes exist in the parser. If this reddens,
+    // somebody has narrowed the accepted set again and the only real-world
+    // check on the ruleset has gone with it.
+    for (const body of BODIES) {
+      const parsed = parseUpp(body.upp);
+      expect(isUppError(parsed) ? parsed.message : 'ok', body.name).toBe('ok');
+    }
+  });
+
+  it('reads eleven of the twelve as spaceports, and Terra as a starport', () => {
+    // Terra is the system's mainworld and is the only one with a starport
+    // class. That asymmetry is the whole point of the second set, so it is
+    // asserted rather than assumed.
+    const kinds = BODIES.map((b) => {
+      const parsed = parseUpp(b.upp);
+      if (isUppError(parsed)) throw new Error(`${b.name} did not parse`);
+      return [b.name, portKind(parsed.starport)] as const;
+    });
+    expect(kinds.filter(([, k]) => k === 'starport').map(([n]) => n)).toEqual(['Terra']);
+    expect(kinds.filter(([, k]) => k === 'spaceport')).toHaveLength(BODIES.length - 1);
+  });
+
+  it('calls the panel heading a Spaceport when it is one', () => {
+    const luna = parseUpp('F20076C-F');
+    if (isUppError(luna)) throw new Error('Luna did not parse');
+    const terra = parseUpp('A867A69-F');
+    if (isUppError(terra)) throw new Error('Terra did not parse');
+    expect(describeUpp(luna).positions[0]!.name).toBe('Spaceport');
+    expect(describeUpp(terra).positions[0]!.name).toBe('Starport');
+    // And the prose behind it is the spaceport prose, not a starport class
+    // that happens to share a letter with an ehex digit.
+    expect(describeUpp(luna).positions[0]!.label).toContain('spaceport');
+  });
+});
 
 describe('cepheus-1 Size against real radii', () => {
   it('lands within 10% for every body Traveller Size can represent', () => {

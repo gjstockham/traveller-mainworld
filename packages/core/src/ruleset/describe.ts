@@ -13,7 +13,7 @@
  * other way.
  */
 import type { ParsedUpp, UppPosition } from '../input/upp.js';
-import { UPP_POSITIONS } from '../input/upp.js';
+import { UPP_POSITIONS, portKind } from '../input/upp.js';
 import { CEPHEUS_1 } from './cepheus1/index.js';
 import type { ProseEntry, ProseTables, Ruleset } from './ruleset.js';
 
@@ -34,6 +34,20 @@ export interface DescribedPosition {
   readonly label: string;
   /** A sentence or two for the panel. */
   readonly text: string;
+}
+
+/**
+ * Name to show for position 1, given the class.
+ *
+ * `UPP_POSITIONS` calls it "Starport" because that is the position's name in
+ * the encoding and in every error message, and that must not vary. What the
+ * *panel* should say does vary: `F` through `Y` are spaceport classes, and a
+ * panel headed "Starport: Good spaceport" is telling a reader two different
+ * things about the same character.
+ */
+function positionName(pos: UppPosition, upp: ParsedUpp): string {
+  if (pos.key !== 'starport') return pos.name;
+  return portKind(upp.starport) === 'spaceport' ? 'Spaceport' : 'Starport';
 }
 
 /** A whole UPP, described. */
@@ -66,7 +80,7 @@ export function describeUpp(upp: ParsedUpp, ruleset: Ruleset = CEPHEUS_1): UppDe
     const entry = proseFor(ruleset.tables.prose, pos, upp);
     return {
       position: pos.position,
-      name: pos.name,
+      name: positionName(pos, upp),
       code: upp.canonical[pos.index] ?? '?',
       value: pos.key === 'starport' ? undefined : upp[pos.key],
       label: entry?.label ?? 'Undescribed',

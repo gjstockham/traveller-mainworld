@@ -71,6 +71,12 @@ A UPP string like `C867A69-8` encodes Starport, **Size, Atmosphere, Hydrographic
 >
 > It also buys better errors. With one accepted shape, every rejection can name a position or a structural fault, which is what R1's "clear inline error" is worth in practice; with four accepted shapes, a malformed input is ambiguous between them and the message degrades to a length complaint. The two withdrawn forms are the likeliest mistakes for someone coming from other Traveller tools, so they get their own messages rather than a generic one.
 
+> **Amendment, 2026-08-05 (WP10).** "A starport class" in R1 now means a starport class **or a spaceport class**: `A`–`E` and `X` as before, plus `F`, `G`, `H` and `Y`, the extended set Traveller uses for the bodies in a system that are not the mainworld.
+>
+> This *widens* the accepted set and so does not reopen the amendment above — the shape is still exactly one, and every rejection still names a position. What prompted it is that published system data uses the extended codes heavily: of the twelve bodies in the Traveller wiki's Terra system, eleven — Luna, Mercury, Mars, Callisto, Titan among them — carry `F`, `G`, `H` or `Y` and were rejected outright. Those are the only real bodies this project can check its Size and crater tables against, and `packages/core/test/solarSystem.test.ts` now does so.
+>
+> Nothing physical changes. The interpreter reads Size, Atmosphere and Hydrographics and never looks at position 1, so no generated value, spec hash or ruleset digest moves. The product remains about mainworlds (§1); this is about being able to *read* a system's other bodies, not about promising to render them well.
+
 ### 6.2 Ruleset interpretation layer (pluggable)
 
 The interpreter is a pure function: `(UPP, ruleset) → PhysicalWorldSpec`. It contains **all** rules knowledge; the generator downstream knows nothing about UPPs.

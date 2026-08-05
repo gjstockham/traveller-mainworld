@@ -474,9 +474,12 @@ Within those four files the Open Game Content is the *rules-derived data* — th
 code-to-value mappings and the plain-English meaning of each code. The
 surrounding TypeScript is not, and neither are the columns that no ruleset has
 an opinion about (`craterPreservation` and `baseTemperature` on the atmosphere
-table; `terrainAmplitudeM`, `fbmFrequency` and `fbmOctaves` on the size table).
-Each file marks its own boundary. The assembler in `ruleset/interpret.ts` holds
-no table values and is MIT.
+table; `terrainAmplitudeM`, `fbmFrequency` and `fbmOctaves` on the size table),
+**nor the spaceport classes `F`, `G`, `H` and `Y` in `prose.ts`** — those are
+Traveller's extended set for non-mainworld system bodies, are not in the Cepheus
+SRD, and their wording is original to this project. Each file marks its own
+boundary at the line rather than leaving it to this paragraph. The assembler in
+`ruleset/interpret.ts` holds no table values and is MIT.
 
 **Two obligations are outstanding and both are pre-release, not pre-merge:**
 

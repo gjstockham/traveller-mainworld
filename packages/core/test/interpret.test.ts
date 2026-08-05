@@ -65,9 +65,13 @@ const MAX = Object.fromEntries(
 
 describe('interpret — total over every valid UPP', () => {
   // The three positions the interpreter actually reads, exhaustively, against
-  // every starport class: 6 × 11 × 16 × 11 = 11,616 worlds. The other four
-  // positions are covered by the invariance test below rather than by
-  // multiplying this into billions.
+  // every port class — six starports and four spaceports, so
+  // 10 × 11 × 16 × 11 = 19,360 worlds. The other four positions are covered by
+  // the invariance test below rather than by multiplying this into billions.
+  //
+  // The count is written as the product rather than as a literal on purpose:
+  // adding the spaceport classes moved it, and a literal would have had to be
+  // hand-edited to a number nobody could check.
   const specs: PhysicalWorldSpec[] = [];
   for (const sp of STARPORT_CLASSES) {
     for (let size = 0; size <= MAX.size!; size++) {
@@ -79,8 +83,13 @@ describe('interpret — total over every valid UPP', () => {
     }
   }
 
-  it('produces a spec for all 11,616 of them without throwing', () => {
-    expect(specs).toHaveLength(6 * 11 * 16 * 11);
+  it('produces a spec for every one of them without throwing', () => {
+    expect(specs).toHaveLength(
+      STARPORT_CLASSES.length * (MAX.size! + 1) * (MAX.atmosphere! + 1) * (MAX.hydrographics! + 1),
+    );
+    // Sanity, so a table that silently lost a row cannot make the product agree
+    // with itself while covering less.
+    expect(specs.length).toBe(19_360);
   });
 
   it('never produces a non-finite number', () => {
@@ -102,20 +111,36 @@ describe('interpret — total over every valid UPP', () => {
   });
 
   it('keeps every bounded field inside its bounds', () => {
+    // Violations are collected and asserted once, in the same shape as the
+    // finiteness test above. That is not only tidier: this used to run six
+    // `expect` calls per spec, and when the spaceport classes took the spec
+    // count from 11,616 to 19,360 that became 116,000 assertions and the test
+    // started timing out under load. A test that fails on a busy machine and
+    // passes on an idle one is worse than a slow one — it teaches people to
+    // re-run it.
+    const bad: string[] = [];
+    const check = (ok: boolean, what: string, value: number): void => {
+      if (!ok && bad.length < 10) bad.push(`${what} = ${String(value)}`);
+    };
+
     for (const spec of specs) {
-      expect(spec.radiusKm).toBeGreaterThan(0);
-      expect(spec.terrainAmplitudeM).toBeGreaterThan(0);
-      expect(spec.craters.transitionDiameterKm).toBeGreaterThan(0);
-      for (const fraction of [
-        spec.hydrographicCoverage,
-        spec.hints.iceLikelihood,
-        spec.craters.densityScale,
-        spec.craters.regolithMaturity,
-      ]) {
-        expect(fraction).toBeGreaterThanOrEqual(0);
-        expect(fraction).toBeLessThanOrEqual(1);
+      check(spec.radiusKm > 0, 'radiusKm', spec.radiusKm);
+      check(spec.terrainAmplitudeM > 0, 'terrainAmplitudeM', spec.terrainAmplitudeM);
+      check(
+        spec.craters.transitionDiameterKm > 0,
+        'craters.transitionDiameterKm',
+        spec.craters.transitionDiameterKm,
+      );
+      for (const [name, fraction] of [
+        ['hydrographicCoverage', spec.hydrographicCoverage],
+        ['hints.iceLikelihood', spec.hints.iceLikelihood],
+        ['craters.densityScale', spec.craters.densityScale],
+        ['craters.regolithMaturity', spec.craters.regolithMaturity],
+      ] as const) {
+        check(fraction >= 0 && fraction <= 1, name, fraction);
       }
     }
+    expect(bad).toEqual([]);
   });
 
   it('is pure: the same UPP interprets identically every time', () => {

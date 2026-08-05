@@ -29,17 +29,52 @@
  * that discards Starport, Pop, Gov, Law and TL is a parser that gets rewritten.
  */
 
-/** A starport class. Categorical, unlike every other position. */
-export type StarportClass = 'A' | 'B' | 'C' | 'D' | 'E' | 'X';
+/**
+ * A starport or spaceport class. Categorical, unlike every other position.
+ *
+ * Two sets, and they are not the same thing. `A`–`E` and `X` are **starport**
+ * classes, which is what a mainworld has. `F`, `G`, `H` and `Y` are
+ * **spaceport** classes, used for the other bodies in a system — the moons,
+ * belts and outposts that are not the world the system is named for. A Class F
+ * facility is not a small starport; it is a facility of a different kind, and
+ * calling it one in the info panel would be wrong.
+ */
+export type StarportClass = 'A' | 'B' | 'C' | 'D' | 'E' | 'X' | 'F' | 'G' | 'H' | 'Y';
+
+/** Classes that denote a starport — a mainworld's facility. */
+export const STARPORT_ONLY: readonly StarportClass[] = ['A', 'B', 'C', 'D', 'E', 'X'];
+
+/** Classes that denote a spaceport — a non-mainworld body's facility. */
+export const SPACEPORT_ONLY: readonly StarportClass[] = ['F', 'G', 'H', 'Y'];
+
+/** Which kind of facility a class denotes. */
+export function portKind(cls: StarportClass): 'starport' | 'spaceport' {
+  return SPACEPORT_ONLY.includes(cls) ? 'spaceport' : 'starport';
+}
 
 /**
- * The valid starport classes.
+ * The valid starport and spaceport classes.
  *
  * The one position PRD §6.1 gives no range for, validated here anyway: a typed
  * `Z` is exactly the catchable typo the rest of this file exists to catch.
  *
- * **WP9 decided this stays here** — the set of starport classes is an
- * *encoding* fact, not a ruleset fact. Three reasons, in order of weight:
+ * **The spaceport classes were added after the fact, and this file predicted
+ * it.** Reason 3 below already said that a ruleset with a different set is a
+ * different encoding, that learning to read it is a parser change, and that a
+ * parser change is the honest place for it. What prompted it was the Traveller
+ * wiki's Terra system, where eleven of the twelve bodies — Luna, Mercury,
+ * Callisto, Titan — are typed `F`, `G`, `H` or `Y` and were rejected outright.
+ * Those bodies are the only real-world crater and radius data this project has
+ * to check `cepheus-1` against, so refusing to read them cost something
+ * concrete.
+ *
+ * Nothing physical changes: `interpret` reads Size, Atmosphere and
+ * Hydrographics and never looks at this position, so widening it cannot move a
+ * generated value, a spec hash or the ruleset digest. What it changes is which
+ * strings the app will take, and the prose the info panel shows for them.
+ *
+ * **WP9 decided this stays here** — the set of port classes is an *encoding*
+ * fact, not a ruleset fact. Three reasons, in order of weight:
  *
  * 1. **Consistency with every other position.** `UPP_POSITIONS` already
  *    hardcodes that Hydrographics stops at `A` and Government at `F`. Those
@@ -57,13 +92,20 @@ export type StarportClass = 'A' | 'B' | 'C' | 'D' | 'E' | 'X';
  *    rules add an `F` starport, the string `F867A69-8` is a string this parser
  *    should learn to read. That is a parser change, which is the honest place
  *    for it, and the WP8 comment's "range check against the ruleset's set"
- *    would have hidden it in a data table.
+ *    would have hidden it in a data table. This is that change, made exactly
+ *    where the comment said it belonged.
  *
  * The ruleset's obligation runs the other way: `cepheus-1` must have prose for
  * every class listed here, and `describe.test.ts` asserts exactly that, so the
  * two cannot drift apart.
+ *
+ * Order matters only in that error messages list them in it: starports first,
+ * then spaceports, because a mainworld is what most people are typing.
  */
-export const STARPORT_CLASSES: readonly StarportClass[] = ['A', 'B', 'C', 'D', 'E', 'X'];
+export const STARPORT_CLASSES: readonly StarportClass[] = [
+  ...STARPORT_ONLY,
+  ...SPACEPORT_ONLY,
+];
 
 /**
  * Traveller extended hex, which omits `I` and `O` so they cannot be misread as
@@ -274,8 +316,13 @@ export function parseUpp(text: string): UppParseResult {
   if (!STARPORT_CLASSES.includes(starportChar as StarportClass)) {
     return fail(
       'bad-starport',
-      `Position 1 (Starport): '${trimmed[0] ?? ''}' is not a starport class. ` +
-        `Expected ${STARPORT_CLASSES.join(', ')}.`,
+      // Both sets are named, and named as what they are. "Expected A, B, C, D,
+      // E, X, F, G, H, Y" reads as ten interchangeable letters in a jumbled
+      // order; saying which are starports and which are spaceports is what
+      // tells someone typing a moon's code that there is a set for that.
+      `Position 1 (Starport): '${trimmed[0] ?? ''}' is not a starport or spaceport class. ` +
+        `Expected a starport (${STARPORT_ONLY.join(', ')}) ` +
+        `or a spaceport (${SPACEPORT_ONLY.join(', ')}).`,
       1,
       0,
     );

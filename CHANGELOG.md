@@ -30,6 +30,42 @@ above is the copy that is, and the README repeats it.
 
 ---
 
+## Unreleased — spaceport classes
+
+**No identity moved and none should have.** The interpreter reads Size,
+Atmosphere and Hydrographics and never looks at position 1, so widening what
+that position accepts cannot change a generated value. `GEN_VERSION` stays
+`0.2.0-alpha.3`, the `cepheus-1` digest stays `1aee16af5a72464b…`, and the
+fixture set stays `4f23f0304c09635f…`. Recorded here anyway, because it changes
+which strings the app will take, and that is a promise to a share URL just as
+much as a hash is.
+
+- **`parseUpp` accepts the extended spaceport classes** `F`, `G`, `H` and `Y`
+  alongside the starport classes `A`–`E` and `X`. `input/upp.ts` predicted this
+  in its own words — "if house rules add an `F` starport, the string `F867A69-8`
+  is a string this parser should learn to read; that is a parser change, which is
+  the honest place for it" — and this is that change, made where the comment said
+  it belonged. PRD R1 is amended to match rather than left contradicting the
+  parser.
+
+  What prompted it: of the twelve bodies in the Traveller wiki's Terra system,
+  eleven carry an extended code and were rejected outright. Those bodies are the
+  only real-world data this project has to check `cepheus-1` against, so refusing
+  to read them cost something concrete — `packages/core/test/solarSystem.test.ts`
+  had to substitute an `X` to get at the physics, and now does not.
+
+- **A spaceport is not a small starport**, and the code says so. `portKind()`
+  distinguishes the two sets, `describeUpp` heads the panel "Spaceport" when the
+  class is one, and the rejection message names both sets separately — "expected
+  a starport (A, B, C, D, E, X) or a spaceport (F, G, H, Y)" rather than ten
+  letters in a jumbled order.
+
+- **Licensing: the four new prose entries are not Open Game Content.** The
+  extended spaceport codes are not in the Cepheus SRD, so their wording is
+  original to this project and is separated inside `prose.ts` with the boundary
+  marked at the line. The README's licensing table says so too. The OGL notice at
+  the top of that file was previously unqualified and now is not.
+
 ## 0.2.0-alpha.3 — a size-frequency distribution with no wall in it (WP10)
 
 Flying `alpha.2` produced a second visual finding — *not enough large craters* —

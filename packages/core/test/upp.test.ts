@@ -172,7 +172,12 @@ describe('parseUpp — rejections name the offending position', () => {
       input: 'Z867A69-8',
       code: 'bad-starport',
       position: 1,
-      says: ['Position 1 (Starport)', "'Z' is not a starport class", 'A, B, C, D, E, X'],
+      says: [
+        'Position 1 (Starport)',
+        "'Z' is not a starport or spaceport class",
+        'starport (A, B, C, D, E, X)',
+        'spaceport (F, G, H, Y)',
+      ],
     },
     {
       label: 'digit as starport class',
