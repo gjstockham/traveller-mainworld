@@ -333,7 +333,31 @@ function perturb(world: World, path: string): World {
   return { ...world, spec: clone as unknown as World['spec'] };
 }
 
-describe('running fixtures', () => {
+/**
+ * Every test in this block generates whole worlds, and none of them belongs on
+ * vitest's five-second default.
+ *
+ * That default was never chosen for them — it is what they got by saying
+ * nothing, while the comparable tests in `battery.test.ts`, `craters.test.ts`
+ * and `regolith.test.ts` all carry explicit budgets of 120 s or more. The gap
+ * showed up as a red `test (windows-latest)` leg on WP13's push: `discriminates:
+ * a generator that ignores its tile id` had run in 3266 ms on WP12's commit and
+ * 3477 ms on WP11's, then took **5064 ms** once WP13 added a fourth package's
+ * worth of CPU-bound tests to run alongside it. Nothing about the test or the
+ * generator changed; it was contention on a four-core runner.
+ *
+ * A test whose pass depends on what else is running is not measuring the thing
+ * it names, and the next victim was already picked: `reproduces the committed
+ * hashes for a full-size fixture` was at 22 470 ms of a 30 s budget on the same
+ * run, and its explicit timeout was *tighter* than this block's, so it has been
+ * removed in favour of this one.
+ *
+ * 120 s matches the sibling files. These are CPU-bound deterministic loops —
+ * they do not hang in interesting ways, they just take a while on a slow box —
+ * so a generous budget costs nothing and a tight one costs a red build on an
+ * unrelated commit.
+ */
+describe('running fixtures', { timeout: 120_000 }, () => {
   it('reproduces the committed hashes for a full-size fixture', () => {
     // One fixture at the real size, not the whole set: each fixture's hashes are
     // independent, so this is a genuine comparison against the committed
@@ -348,7 +372,7 @@ describe('running fixtures', () => {
     expect(result.tiles).toBe(expected.tiles);
     expect(result.vertices).toBe(expected.vertices);
     expect(result.albedoDistinct).toBe(expected.albedoDistinctValues);
-  }, 30_000);
+  });
 
   it('is not affected by how the run is sharded', () => {
     // The verification page splits the set across a pool of workers. That is a

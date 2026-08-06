@@ -32,7 +32,12 @@ function pool(job: ExportJob, count: number): BandWorker[] {
   return Array.from({ length: count }, () => new LocalBandWorker(job));
 }
 
-describe('bands are independent, so the pool is free', () => {
+// Sixteen pooled renders of the same map, so this block is generation-bound like
+// the fixture and crater suites and takes their budget rather than vitest's
+// five-second default. It ran in 3839 ms on the Windows CI runner — 77% of a
+// default nobody chose — which is the state `fixtures.test.ts` was in when WP13's
+// push turned that leg red.
+describe('bands are independent, so the pool is free', { timeout: 120_000 }, () => {
   it('gives the same image at every pool size and every band height', async () => {
     // The property that makes the parallelism free rather than a source of
     // nondeterminism. A band's pixels are a pure function of the band, so bands

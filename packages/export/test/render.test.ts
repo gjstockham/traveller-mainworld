@@ -294,7 +294,8 @@ describe('seam-free by construction', () => {
 
 // --- the cull is a superset, and culling must not change a pixel -------------
 
-describe('the row-band basin cull changes nothing', () => {
+// Six full renders of the same map. Same reasoning as the pool block above.
+describe('the row-band basin cull changes nothing', { timeout: 120_000 }, () => {
   it('produces the same image at every band height', () => {
     // The cull is rebuilt per band, so a different band height culls against a
     // different box. `BasinCull` is documented as a superset filter and

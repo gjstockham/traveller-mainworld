@@ -30,6 +30,32 @@ above is the copy that is, and the README repeats it.
 
 ---
 
+## Unreleased — WP13 follow-up: the Windows CI leg
+
+**No identity moved; no source file changed.** Test budgets only.
+
+WP13's push turned `test (windows-latest)` red, and only that leg.
+`fixtures.test.ts > discriminates: a generator that ignores its tile id` timed
+out at **5064 ms** against vitest's five-second default, having run in 3266 ms on
+WP12's commit and 3477 ms on WP11's. Nothing about the test or the generator
+changed: WP13 added a fourth package's worth of CPU-bound tests to run alongside
+it on a four-core runner, and 65% of a budget became 101% of one.
+
+**A test whose pass depends on what else is running is not measuring the thing it
+names.** Every test in that block generates whole worlds, and the comparable
+tests in `battery.test.ts`, `craters.test.ts` and `regolith.test.ts` already
+carry explicit budgets of 120 s or more — `fixtures.test.ts` was the outlier,
+with one test at 30 s and six siblings on a default nobody chose. The block now
+takes `{ timeout: 120_000 }` to match its siblings, and the tighter explicit 30 s
+came off the one test that had it, which was at 22 470 ms of it on the same run
+and was next to go. Two WP13 blocks also above half their budget took the same
+treatment.
+
+The `describe(name, options, fn)` form was verified to apply rather than assumed:
+a seven-second sleep passes inside such a block and dies at 5000 ms outside one.
+A timeout option that was silently ignored would have been a fix that fixed
+nothing.
+
 ## Unreleased — WP13: `packages/export`
 
 **No identity moved, and an export work package that moved one would be a bug.**
