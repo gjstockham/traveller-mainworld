@@ -12,7 +12,7 @@ Identities after this work package:
 | Fixture digest | `082672301e778cd6…` (was `9d20abd809becf92…`) |
 | Ruleset `cepheus-1` | `1aee16af5a72464b…` — unmoved since WP9 |
 
-`pnpm check` green: 44 files, 761 tests. All four golden artefacts verify.
+`pnpm check` green: 44 files, 762 tests. All four golden artefacts verify.
 
 ---
 
@@ -328,6 +328,16 @@ M12 and M13 are the reason `DensityBenchRow` and `DepthBenchRow` carry a
 it would return plausible, slightly different timings and have no other symptom
 at all — the timings cannot carry that assertion, so a value that is a pure
 function of the world generated does.
+
+**The campaign ran on one operating system, and that is exactly how it missed
+one.** The first `resolveOutput` tests asserted against `'/r/phase1.md'` — a
+literal path separator — which is correct on Linux and macOS and wrong on
+Windows, where `path.join` produces `\r\phase1.md`. Thirteen mutations, a full
+`pnpm check`, and two green golden legs all passed it; the Windows CI cell turned
+red on the commit. Fixed by asserting on `basename` and `dirname`, which is what
+the function actually decides — the joining is `node:path`'s job. **A test that
+encodes a path separator is testing the runner's operating system**, and no
+amount of mutation on one platform finds that.
 
 **One test escaped a change it existed to catch, and it was in this repository
 already.** `fixtures.test.ts`'s "moves when the tile set or grid size changes"

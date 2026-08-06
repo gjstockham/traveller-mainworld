@@ -21,6 +21,8 @@ import {
   tileDepth,
   tileFace,
 } from '@traveller-mainworld/core';
+import { basename, dirname, join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { bytes, ms, time } from '../src/harness.js';
@@ -233,9 +235,24 @@ describe('the basin field measurement', () => {
 });
 
 describe('results path', () => {
+  // Asserted on the **basename**, because that is what `resolveOutput` decides —
+  // joining it to a directory is `node:path`'s job, and `path.join` is
+  // platform-dependent. The first version of these tests compared against
+  // `'/r/phase1.md'`, passed on Linux and macOS, and turned the Windows CI cell
+  // red on `\r\phase1.md`. A test that encodes a path separator is testing the
+  // runner's operating system.
+  const nameFor = (argv: readonly string[]): string => basename(resolveOutput(argv, '/r').path);
+
   it('defaults to the current phase, and separates quick runs', () => {
-    expect(resolveOutput([], '/r')).toEqual({ path: `/r/phase${String(DEFAULT_PHASE)}.md`, phase: DEFAULT_PHASE });
-    expect(resolveOutput(['--quick'], '/r').path).toBe(`/r/phase${String(DEFAULT_PHASE)}-quick.md`);
+    expect(nameFor([])).toBe(`phase${String(DEFAULT_PHASE)}.md`);
+    expect(nameFor(['--quick'])).toBe(`phase${String(DEFAULT_PHASE)}-quick.md`);
+    expect(resolveOutput([], '/r').phase).toBe(DEFAULT_PHASE);
+  });
+
+  it('writes into the directory it is given', () => {
+    // The other half of the path, kept as its own assertion so the basename
+    // tests above do not have to care how the two are joined.
+    expect(dirname(resolveOutput([], '/results/here').path)).toBe(join('/results/here'));
   });
 
   it('refuses to write phase0.md', () => {
@@ -248,11 +265,9 @@ describe('results path', () => {
 
   it('lets an explicit --out through, including past the phase-0 guard', () => {
     // A guard with no way past it is a guard someone deletes.
-    expect(resolveOutput(['--out=scratch.md'], '/r').path).toBe('/r/scratch.md');
-    expect(resolveOutput(['--phase=0', '--out=redo.md'], '/r')).toEqual({
-      path: '/r/redo.md',
-      phase: 0,
-    });
+    expect(nameFor(['--out=scratch.md'])).toBe('scratch.md');
+    expect(nameFor(['--phase=0', '--out=redo.md'])).toBe('redo.md');
+    expect(resolveOutput(['--phase=0', '--out=redo.md'], '/r').phase).toBe(0);
   });
 
   it('rejects a phase that is not a non-negative integer', () => {
