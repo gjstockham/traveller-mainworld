@@ -45,6 +45,18 @@ import type { FixtureResult } from './fixtures.js';
 
 /** Per-buffer hashes as committed. */
 export interface FixtureEntry {
+  /**
+   * Hash of the interpreted spec this fixture generated from (plan §4.3, R7).
+   *
+   * Recorded per fixture, not merely folded into
+   * {@link FixtureManifest.fixtureSpecHash}, because the aggregate can only say
+   * *that* the inputs moved. Ten of these in the committed file mean a ruleset
+   * change reads as a list of which worlds it altered — and a kernel change
+   * reads as none of them moving while every buffer hash does. Those two are
+   * indistinguishable from the aggregate alone, and telling them apart is the
+   * whole reason the manifest is diffable rather than a single digest.
+   */
+  readonly specHash: string;
   readonly elevation: string;
   readonly waterMask: string;
   readonly materials: string;
@@ -79,7 +91,13 @@ export interface FixtureEntry {
 export interface FixtureManifest {
   /** Generator version these hashes were produced under. Covers `core` only. */
   readonly genVersion: string;
-  /** Identity of the fixture inputs — specs, seeds, tile set, grid size. */
+  /**
+   * Identity of the fixture inputs — UPPs, ruleset ids, seeds, the interpreted
+   * specs, the tile set and the grid size.
+   *
+   * Since WP14 this covers the *ruleset*, which is what makes a `cepheus-1`
+   * table edit fail here rather than forty buffer hashes downstream of it.
+   */
   readonly fixtureSpecHash: string;
   /** Grid resolution each fixture tile was generated at. */
   readonly fixtureN: number;
@@ -97,7 +115,7 @@ export interface FixtureMismatch {
   readonly buffer: string;
   readonly expected: string | undefined;
   readonly actual: string | undefined;
-  readonly reason: 'differs' | 'missing-from-manifest' | 'missing-from-run' | 'shape';
+  readonly reason: 'differs' | 'missing-from-manifest' | 'missing-from-run' | 'shape' | 'spec';
 }
 
 /** Build a fixture manifest from a run. */
@@ -111,6 +129,7 @@ export function buildFixtureManifest(
   const fixtures: Record<string, FixtureEntry> = {};
   for (const r of results) {
     fixtures[r.id] = {
+      specHash: r.specHash,
       elevation: r.elevation,
       waterMask: r.waterMask,
       materials: r.materials,
@@ -190,6 +209,23 @@ export function compareFixtureManifest(
       continue;
     }
 
+    // The spec before anything else: if this fixture is a different world than
+    // the one the manifest pinned, every hash below differs *correctly*, and
+    // reporting four buffer differences would describe the consequence rather
+    // than the cause. In practice `fixtureManifestPreflight` catches this first
+    // and refuses the whole comparison — this is here for the case it cannot
+    // see, a manifest whose aggregate hash was regenerated while a per-fixture
+    // spec was not.
+    if (expected.specHash !== r.specHash) {
+      mismatches.push({
+        fixture: r.id,
+        buffer: '(spec)',
+        expected: expected.specHash,
+        actual: r.specHash,
+        reason: 'spec',
+      });
+    }
+
     // Shape before hashes: a fixture that generated half the tiles would
     // otherwise report three hash differences and no reason for any of them.
     if (expected.tiles !== r.tiles || expected.vertices !== r.vertices) {
@@ -238,6 +274,14 @@ export function formatFixtureMismatches(mismatches: readonly FixtureMismatch[]):
   const lines = [`${String(mismatches.length)} fixture mismatch(es):`, ''];
   for (const m of mismatches) {
     switch (m.reason) {
+      case 'spec':
+        lines.push(
+          `  ${m.fixture} / (spec)  — this fixture interprets to a different world than the`,
+          '    manifest pinned. A ruleset table changed, or the fixture names a different UPP.',
+          `    expected ${m.expected ?? '—'}`,
+          `    actual   ${m.actual ?? '—'}`,
+        );
+        break;
       case 'differs':
       case 'shape':
         lines.push(

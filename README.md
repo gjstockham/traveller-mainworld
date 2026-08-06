@@ -4,12 +4,15 @@ A browser-based tool that turns a Universal Planetary Profile (UPP) plus a seed 
 
 **Status:** Phase 1 (airless rocky worlds), in progress. Phase 0 is complete. The
 UPP parser, the `cepheus-1` interpretation layer, hierarchical crater fields, the
-regolith palette, the input UI and share URLs have landed; the export package has
-not. See [the PRD](docs/requirements/worldgen-prd.md) for scope.
+regolith palette, the input UI, share URLs, the export package and the Phase 1
+golden harness have landed. See [the PRD](docs/requirements/worldgen-prd.md) for
+scope.
 
-The generator version is a **prerelease** (`0.2.0-alpha.4`) for the duration of
-Phase 1 — see [`CHANGELOG.md`](CHANGELOG.md) for why, and for what moves between
-re-pins.
+The generator version is **`0.2.0`**. WP10 through WP13 ran on prereleases so
+that six sessions of in-progress output changes did not mint six versions; WP14
+landed the sequence. From here it is treated as immutable, because `?gen=`
+resolves through a registry and a version re-cut under the same name is the
+failure R15 exists to prevent — see [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Layout
 
@@ -110,12 +113,13 @@ rather than a badge — a belt is a permanent non-goal, not a pending phase.
 | `?meshprobe=1` | Fill new meshes with magenta — see below. |
 
 The first four are R27's share URL, and "Copy link" builds one. **`?gen=` is
-refused rather than honoured** when it names a version this build does not
-produce: R15 obliges the app to render worlds from older generator versions and
-the `generatorFor(version)` registry that will do it is WP14's, so until then the
-dangerous outcome is not an error — it is rendering someone's link with the
-current generator and showing a world that is not the one it promised. Nothing
-has been released, so no such link should exist.
+resolved through `generatorFor(version)`** and refused by name when the registry
+does not have it: R15 obliges the app to render worlds from older generator
+versions, and the dangerous outcome is not an error — it is rendering someone's
+link with the current generator and showing a world that is not the one it
+promised. The registry has one entry. Nothing has been released, so 0.1.0's
+implementation was archived rather than retained (`packages/golden/archive/`)
+and no such link should exist.
 
 `?fixture=` flies one of the ten golden fixture worlds:
 
@@ -135,11 +139,13 @@ rather than a copy that could drift. An unknown id is refused with the list
 rather than silently falling back to the default world, and `?seed=` is refused
 alongside `?fixture=` because a fixture's seed is part of what is pinned.
 
-**Everything except `?fixture=` shows a world the interpreter actually
-produced.** Every fixture overrides the fBm parameters after interpreting —
-deliberately, since the set exists to discriminate — so `cepheus-1`'s own
-`fbmFrequency` and `fbmOctaves` columns are only ever seen on the UPP route. That
-route overrides nothing:
+**Every world here is one the interpreter actually produced, fixtures
+included** — which was not true before WP14. Each fixture used to override its
+fBm parameters after interpreting, so `cepheus-1`'s own `fbmFrequency` and
+`fbmOctaves` columns were only ever seen on the UPP route and the golden manifest
+pinned ten worlds the shipping path could not reach. The fixtures are now
+`(UPP, ruleset, seed)` triples with nothing applied on top, and the diversity
+that override bought moved into the determinism battery:
 
 ```
 ?upp=F20076C-F            Luna, as the Traveller wiki writes it (the default)
@@ -347,14 +353,28 @@ magnitudes at both ends of the double range — then hashes the canonical
 little-endian bytes of the results.
 
 **The golden fixtures** (`fixtures.json`) generate ten whole worlds through the
-same `TileGenerator` the viewer ships. Ten hand-written specs spanning Cepheus
-sizes 1–A, each evaluated over a fixed 90-tile set covering all six faces at
-depths 0–6 — deliberately including every face corner and edge-adjacent tiles in
-both orientations, because that is where a tangent-warp mapping bug shows first
-and a face interior is where it shows last. Each output buffer is hashed
-separately: elevation, water mask, materials. A kernel function can be perfectly
-bit-stable while the composition of them into a tile is not, and this is what
-catches that.
+same `TileGenerator` the viewer ships. Ten `(UPP, ruleset, seed)` triples
+spanning Cepheus sizes 1–A at Atmosphere 0–1 and Hydrographics 0, each evaluated
+over a fixed 90-tile set covering all six faces at depths 0–6 — deliberately
+including every face corner and edge-adjacent tiles in both orientations, because
+that is where a tangent-warp mapping bug shows first and a face interior is where
+it shows last. Each output buffer is hashed separately: elevation, water mask,
+materials, albedo. A kernel function can be perfectly bit-stable while the
+composition of them into a tile is not, and this is what catches that.
+
+Each fixture also carries the hash of its **interpreted spec**, and the fixture
+identity covers the UPP, the ruleset id and the whole spec `interpret()`
+produced. That is the enforcement for R7: a `cepheus-1` table edit fails at the
+preflight, before a tile is generated, rather than as forty changed buffer
+hashes with nothing to say which of a table edit and a kernel change caused
+them. Per-fixture spec hashes are what separates those two in a diff — a ruleset
+change moves some of them and a kernel change moves none.
+
+**What the albedo hash pins is the byte, not the scalar.** It is hashed after
+quantisation, where one step is 1/255, and reordering a float sum moves the
+value behind it by ~1e-16. So an albedo change smaller than 1/255 everywhere is
+a change these manifests will call clean; `elevation` is the buffer that makes
+the bit-stability claim, hashed as `Float64` on the same tiles in the same run.
 
 Running both on every browser and OS is what turns "should be identical" into
 "demonstrably is". CI fails on any mismatch. (`pnpm golden:parity`, the TS↔WASM
@@ -381,9 +401,11 @@ editing one alters output for no input a user can reach, and bumping the
 generator version for it would mint a phantom version with no code behind it.
 
 So `genVersion` covers `packages/core` only, and the fixture set carries its own
-identity — a **fixture-spec hash** over the specs, seeds, tile set and grid size.
-Edit a radius and that hash moves, visibly, without touching the kernel's version
-and without invalidating evidence about arithmetic that did not change. Given the
+identity — a **fixture-spec hash** over the UPPs, ruleset ids, seeds, interpreted
+specs, tile set and grid size. Change a fixture's UPP, or edit a `cepheus-1`
+table under it, and that hash moves, visibly, without touching the kernel's
+version and without invalidating evidence about arithmetic that did not change.
+Given the
 fixture set needs its own key regardless, folding its hashes into `manifest.json`
 would buy one file and cost the thing that matters: the battery digest would then
 move whenever a fixture changed, so every citation of it as *kernel* evidence

@@ -1,0 +1,3 @@
+# Quick runs are three iterations for checking the harness works. They are not
+# results, and before WP14 they were written over the ones that are.
+phase0-quick.md

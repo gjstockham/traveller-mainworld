@@ -460,6 +460,16 @@ function rayAt(dx: number, dy: number, dz: number, distance: number, seed: numbe
  * insensitivity rather than the ordering, so it goes red on exactly that change
  * rather than passing while proving nothing.
  *
+ * **WP14 turned that paragraph into a claim CI makes.** The albedo byte is now
+ * pinned in `fixtures.json`, so what a green matrix cell asserts about this
+ * function is that its *quantised* output is identical across engines — not
+ * that the sum above is. Both halves of that are deliberate and the second is
+ * the load-bearing one: a change here smaller than 1/255 everywhere is a change
+ * the golden manifest will call clean, and anyone reading a green build as
+ * proof that this arithmetic is bit-stable is reading it wrong. The buffer that
+ * makes the bit-stability claim is `elevation`, hashed as `Float64` on the same
+ * tiles in the same run. See `FixtureResult.albedo` in the golden harness.
+ *
  * @param out Two-element scratch: `[brightening, mare fill coverage]`.
  */
 function compositeRegolith(

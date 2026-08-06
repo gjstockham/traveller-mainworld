@@ -7,7 +7,7 @@
  * the world depends on, and that it refuses to name something this build cannot
  * honour — is exactly what these tests are for.
  */
-import { DEFAULT_RULESET, GEN_VERSION } from '@traveller-mainworld/core';
+import { DEFAULT_RULESET, GEN_VERSION, knownGeneratorVersions } from '@traveller-mainworld/core';
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_SUN, clampSun, formatSun, sunFrom, sunVector } from '../src/render/sun.js';
@@ -115,25 +115,42 @@ describe('the share query', () => {
 });
 
 describe('?gen=', () => {
-  it('accepts its own version, and absence', () => {
-    expect(checkGenVersion(q(''), '9.9.9')).toBe('9.9.9');
-    expect(checkGenVersion(q('?gen=9.9.9'), '9.9.9')).toBe('9.9.9');
+  it('accepts a version the registry has, and absence', () => {
+    expect(checkGenVersion(q(''), ['9.9.9'])).toBe('9.9.9');
+    expect(checkGenVersion(q('?gen=9.9.9'), ['9.9.9'])).toBe('9.9.9');
+  });
+
+  it('RESOLVES THROUGH THE REGISTRY RATHER THAN COMPARING TO THE CURRENT VERSION', () => {
+    // The WP14 change, and the only test that can tell the two implementations
+    // apart. Before the registry this was `asked === current`, so a build that
+    // knew two versions would have refused the older one — the exact failure
+    // R15 exists to prevent, arriving on the day the second entry landed.
+    // Asserted with a *second* entry present, which the real registry does not
+    // have yet and which is the whole reason the list is a parameter.
+    expect(checkGenVersion(q('?gen=0.1.0'), ['0.2.0', '0.1.0'])).toBe('0.1.0');
+    // And the returned version is the one asked for, not the current one, so a
+    // caller resolving it through `generatorFor` gets the right generator.
+    expect(checkGenVersion(q('?gen=0.2.0'), ['0.2.0', '0.1.0'])).toBe('0.2.0');
   });
 
   it('refuses a version this build cannot produce, and says why', () => {
-    // R15's obligation is to *render* older versions, and the registry that
-    // will is WP14's. Until then the dangerous outcome is not an error — it is
-    // rendering a 0.1.0 link with the current generator and showing a world
-    // that is not the one the link promised.
-    expect(() => checkGenVersion(q('?gen=0.1.0'), '0.2.0')).toThrow(/0\.1\.0/);
-    expect(() => checkGenVersion(q('?gen=0.1.0'), '0.2.0')).toThrow(/this build produces 0\.2\.0/);
-    expect(() => checkGenVersion(q('?gen=0.1.0'), '0.2.0')).toThrow(/R15/);
+    // The dangerous outcome is not an error — it is rendering a 0.1.0 link with
+    // the current generator and showing a world that is not the one the link
+    // promised. The message names every version the build has, because "this
+    // build produces 0.2.0" stops being the whole truth at two entries.
+    expect(() => checkGenVersion(q('?gen=0.1.0'), ['0.2.0'])).toThrow(/0\.1\.0/);
+    expect(() => checkGenVersion(q('?gen=0.1.0'), ['0.2.0'])).toThrow(/this build produces: 0\.2\.0/);
+    expect(() => checkGenVersion(q('?gen=0.1.0'), ['0.2.0', '0.3.0'])).toThrow(/0\.2\.0, 0\.3\.0/);
+    expect(() => checkGenVersion(q('?gen=0.1.0'), ['0.2.0'])).toThrow(/R15/);
   });
 
-  it('defaults to this build, so the check is not a test of one string against itself', () => {
-    // The version is passed explicitly above precisely so those tests do not go
-    // quiet when GEN_VERSION is bumped. This is the one that pins the default.
+  it('defaults to the real registry, so the check is not a test of one list against itself', () => {
+    // The versions are passed explicitly above precisely so those tests do not
+    // go quiet when GEN_VERSION is bumped. This is the one that pins the
+    // default, and that the registry really does hold this build's version.
     expect(checkGenVersion(q(''))).toBe(GEN_VERSION);
+    expect(checkGenVersion(q(`?gen=${GEN_VERSION}`))).toBe(GEN_VERSION);
+    expect(knownGeneratorVersions()).toContain(GEN_VERSION);
     expect(() => checkGenVersion(q('?gen=not-a-version'))).toThrow();
   });
 });

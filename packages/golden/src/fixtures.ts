@@ -25,7 +25,9 @@ import {
   canonicalBytes,
   canonicalBytesU8,
   makeTileId,
+  serialiseSpec,
   sha256Hex,
+  specHash,
   tileToString,
 } from '@traveller-mainworld/core';
 
@@ -175,6 +177,17 @@ export function resolveFixtureRun(size: FixtureRunSize = FULL_FIXTURES): {
 /** Hashes of one fixture's output buffers, plus what they were computed over. */
 export interface FixtureResult {
   readonly id: string;
+  /**
+   * SHA-256 of the interpreted spec this fixture generated from (plan §4.3).
+   *
+   * The aggregate {@link fixtureSpecHash} is what the preflight refuses on, and
+   * it says *that* the fixture inputs moved. This says **which**: with one hash
+   * per fixture in the committed manifest, a `git diff fixtures.json` after a
+   * ruleset change is a list of the worlds that changed and the worlds that did
+   * not, which is the only thing that can separate a table edit from a kernel
+   * change when both would move every buffer hash below.
+   */
+  readonly specHash: string;
   /** SHA-256 over the canonical little-endian bytes of every tile's elevation, in tile order. */
   readonly elevation: string;
   /**
@@ -201,6 +214,28 @@ export interface FixtureResult {
    * {@link FixtureResult.albedoDistinct}, which records the opposite claim from
    * the water mask's flag: not that the buffer *is* constant, but by how much it
    * is not.
+   *
+   * ## This pins the byte, not the scalar behind it — decided in WP14
+   *
+   * `elevation` is hashed as `Float64`, so what CI asserts about it is the
+   * arithmetic, to the last bit. Albedo is hashed **after `quantiseAlbedo`**,
+   * and one byte is 1/255. Reordering a float sum moves the scalar by ~1e-16,
+   * about 4e-14 of a byte, so a compositing-order change that would redden
+   * `elevation` instantly is invisible here for every value except one landing
+   * within 1e-16 of a rounding boundary.
+   *
+   * That is not a defect and it is not a promise either, so it is written down
+   * as neither: **the claim this hash makes is "the byte is stable", and it is
+   * exactly as strong as that sounds.** `regolith.ts` says the canonical
+   * compositing order buys albedo nothing at byte resolution rather than
+   * implying a guarantee it does not provide, and `regolith.test.ts` asserts
+   * that insensitivity directly, in both directions, against the float. Pinning
+   * the scalar instead was considered and rejected: it would mint a second
+   * hashed buffer of a quantity nothing renders, to catch a class of change
+   * that `elevation` already catches on the same tile in the same run.
+   *
+   * The thing to know before trusting it: an albedo change smaller than 1/255
+   * everywhere is a change this manifest will call clean.
    */
   readonly albedo: string;
   /** Tiles evaluated. */
@@ -297,6 +332,7 @@ export function runFixture(
 
   return {
     id: fixture.id,
+    specHash: specHash(fixture.world.spec),
     elevation: sha256Hex(canonicalBytes(elevation)),
     waterMask: sha256Hex(canonicalBytesU8(waterMask)),
     materials: sha256Hex(canonicalBytesU8(materials)),
@@ -377,6 +413,37 @@ function asciiBytes(text: string): Uint8Array {
  * ECMAScript number-to-string algorithm is exact and specified, so every engine
  * renders these identically.
  *
+ * ## What WP14 added, and what it is the enforcement for
+ *
+ * Until WP14 this listed the ten spec fields that reached generation, and an
+ * exclusion list in `fixtures.test.ts` carried the rest with the phase that
+ * would consume each. That was right while the specs were hand-written, and
+ * wrong once they were interpreted: the thing that decides a fixture is no
+ * longer the spec, it is the **`(UPP, ruleset, seed)` triple**, and the spec is
+ * what the interpreter makes of it.
+ *
+ * So all three appear here, and the whole interpreted spec with them, through
+ * `core`'s own `serialiseSpec` — plan §4.3's spec hashing, which is the
+ * enforcement for R7. A `cepheus-1` table edit now moves this hash, and
+ * `fixtureManifestPreflight` refuses the comparison **before a single tile is
+ * generated**, naming the fixture set rather than reporting forty changed
+ * buffer hashes. A one-digit table edit silently changing every world anyone
+ * has ever shared is the risk in plan §13 this closes.
+ *
+ * Two consequences worth stating rather than discovering:
+ *
+ * - **A field that reaches no tile is now hashed anyway.** `atmosphere.*` and
+ *   the climate hints are Phase 2 and Phase 4 work, and editing one today moves
+ *   this hash while every buffer hash stays put. That is the intended reading:
+ *   the fixture identity is what the interpreter produced, not the subset the
+ *   current phase happens to consume, and a table edit that will change worlds
+ *   two phases from now should be a protocol event on the day it is made.
+ * - **`serialiseSpec` is the single copy.** A field added to
+ *   `PhysicalWorldSpec` and not added there is hashed as though it did not
+ *   exist — which `packages/core/test/serialise.test.ts` turns into a red test
+ *   by walking the spec's own leaves, and which `fixtures.test.ts` checks again
+ *   from this side.
+ *
  * Descriptions are excluded deliberately. Fixing a typo in one is not a change
  * to what is generated, and should not cost a protocol event.
  */
@@ -387,25 +454,19 @@ export function serialiseFixtureSpecs(
 ): string {
   const lines: string[] = [`n=${String(n)}`, `tiles=${tiles.map(String).join(',')}`];
   for (const f of fixtures) {
-    const { spec } = f.world;
     lines.push(
       `fixture=${f.id}`,
-      `  radiusKm=${String(spec.radiusKm)}`,
-      `  terrainAmplitudeM=${String(spec.terrainAmplitudeM)}`,
-      // WP10: read by `generateTile`, so covered here from the commit that made
-      // them so. `fixtures.test.ts` perturbs every field the hash does *not*
-      // cover and fails if the elevation moves, which is what turns the
-      // exclusion list from a claim into a check.
-      `  craters.densityScale=${String(spec.craters.densityScale)}`,
-      `  craters.transitionDiameterKm=${String(spec.craters.transitionDiameterKm)}`,
-      `  craters.regolithMaturity=${String(spec.craters.regolithMaturity)}`,
-      `  fbm.octaves=${String(spec.fbm.octaves)}`,
-      `  fbm.frequency=${String(spec.fbm.frequency)}`,
-      `  fbm.amplitude=${String(spec.fbm.amplitude)}`,
-      `  fbm.lacunarity=${String(spec.fbm.lacunarity)}`,
-      `  fbm.gain=${String(spec.fbm.gain)}`,
+      `  upp=${f.upp}`,
+      `  ruleset=${f.rulesetId}`,
       `  seedHi=${String(f.world.seedHi >>> 0)}`,
       `  seedLo=${String(f.world.seedLo >>> 0)}`,
+      // The interpreted spec, one leaf per line, in `serialiseSpec`'s fixed
+      // order. Prefixed rather than inlined so a reader of this text can see
+      // which lines are the input and which are what the ruleset made of it.
+      ...serialiseSpec(f.world.spec)
+        .split('\n')
+        .filter((line) => line !== '')
+        .map((line) => `  spec.${line}`),
     );
   }
   return `${lines.join('\n')}\n`;

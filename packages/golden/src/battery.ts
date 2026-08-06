@@ -19,7 +19,9 @@
  */
 import {
   DEFAULT_FBM,
+  type FbmParams,
   GEN_VERSION,
+  MAX_OCTAVES,
   type World,
   canonicalBytes,
   interpretText,
@@ -96,6 +98,43 @@ const BATTERY_WORLD: World = {
   seedHi: 0xdeadbeef,
   seedLo: 0x12345678,
 };
+
+/**
+ * The ten fBm parameter blocks the Phase 0 fixture set used to carry, moved
+ * here in WP14.
+ *
+ * They are reproduced **verbatim**, and the point of that is that nothing was
+ * chosen: this is the same coverage, relocated. Until WP14 the golden fixtures
+ * interpreted a UPP and then overrode the fBm block with one of these, which
+ * bought exactly this diversity — gain either side of 0.5, two non-dyadic
+ * lacunarities, octave counts from 6 up to `MAX_OCTAVES` — at the cost of
+ * pinning ten worlds no UPP can produce. The fixtures now interpret cleanly,
+ * and `cepheus-1` gives every world lacunarity 2 and gain 0.5, so the awkward
+ * lanes would simply have stopped being covered.
+ *
+ * They belong here anyway, and arguably always did. The fixture set is for
+ * whole worlds a user can ask for; the battery is for **kernel functions under
+ * hostile inputs**, which is what a non-dyadic lacunarity is — octave
+ * frequencies that stop being exactly representable, so the accumulated sum
+ * depends on rounding at every step. Here each block gets a hundred thousand
+ * adversarial coordinates instead of one world's tiles, which is a stronger
+ * check than the one it replaces rather than a weaker one.
+ *
+ * The last entry is `MAX_OCTAVES` exactly — `fbm3` clamps there, so it is the
+ * boundary between a request that is honoured and one that is silently reduced.
+ */
+export const HOSTILE_FBM: readonly FbmParams[] = Object.freeze([
+  { octaves: 6, frequency: 0.8, amplitude: 1, lacunarity: 2, gain: 0.5 },
+  { octaves: 8, frequency: 1.2, amplitude: 1, lacunarity: 2, gain: 0.45 },
+  { octaves: 10, frequency: 1.6, amplitude: 1, lacunarity: 2, gain: 0.5 },
+  { octaves: 12, frequency: 2.2, amplitude: 1, lacunarity: 2, gain: 0.55 },
+  { octaves: 9, frequency: 1.9, amplitude: 1, lacunarity: 1.87, gain: 0.5 },
+  { octaves: 14, frequency: 2.5, amplitude: 1, lacunarity: 2, gain: 0.6 },
+  { octaves: 11, frequency: 3.1, amplitude: 1, lacunarity: 2.13, gain: 0.42 },
+  { octaves: 8, frequency: 1.6, amplitude: 1, lacunarity: 2, gain: 0.5 },
+  { octaves: 16, frequency: 4, amplitude: 1, lacunarity: 2, gain: 0.5 },
+  { octaves: MAX_OCTAVES, frequency: 5.5, amplitude: 1, lacunarity: 2, gain: 0.5 },
+]);
 
 function scalarCase(
   name: string,
@@ -246,6 +285,25 @@ export const BATTERY: readonly BatteryCase[] = Object.freeze([
         acc += STRIDE;
         const t = acc % 13;
         out[i] = k.fbm3(t, t * 0.41 - 2.5, t * -0.83 + 1.25, 999, DEFAULT_FBM);
+      }
+      return out;
+    },
+  },
+  {
+    name: 'noise.fbm3.params',
+    run(k, size): Float64Array {
+      // The case above pins one parameter block over a million coordinates.
+      // This one pins ten, and the coordinate walk is identical so that a
+      // difference between the two hashes is attributable to the parameters
+      // alone.
+      const out = new Float64Array(size.samples);
+      const STRIDE = 0.6180339887498949;
+      let acc = 0;
+      for (let i = 0; i < size.samples; i++) {
+        acc += STRIDE;
+        const t = acc % 13;
+        const p = HOSTILE_FBM[i % HOSTILE_FBM.length]!;
+        out[i] = k.fbm3(t, t * 0.41 - 2.5, t * -0.83 + 1.25, 999, p);
       }
       return out;
     },

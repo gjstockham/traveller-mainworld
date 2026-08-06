@@ -20,20 +20,24 @@
  * - **`ruleset`** decides how the UPP is read. It is a promise to a URL somebody
  *   else is holding, which is why a table change mints `cepheus-2` rather than
  *   editing `cepheus-1` in place — see the README. An unknown id fails loudly.
- * - **`gen`** decides which generator produced it, and is the one parameter this
- *   build cannot yet honour for any value but its own. R15 obliges the app to
- *   render worlds from older versions; the `generatorFor(version)` registry that
- *   does it is WP14's, deliberately, because nothing has been released and no
- *   user can be holding a 0.1.0 URL. Until then a `gen` this build cannot
- *   produce is **refused by name** rather than silently rendered with the
- *   current one, which is the failure R15 exists to prevent and the more
- *   dangerous half of it: a world that looks plausible and is not the one the
- *   link promised.
+ * - **`gen`** decides which generator produced it, and is resolved through
+ *   `core`'s `generatorFor(version)` registry (R15). That registry has one
+ *   entry, deliberately: nothing has been released, so no user can be holding a
+ *   0.1.0 URL and 0.1.0's implementation was archived rather than retained. A
+ *   `gen` the registry does not know is **refused by name** rather than
+ *   silently rendered with the current generator, which is the failure R15
+ *   exists to prevent and the more dangerous half of it: a world that looks
+ *   plausible and is not the one the link promised.
  *
  * `camera`, `sun` and `exaggeration` are presentation. They cannot move a
  * generated value, and a URL missing all three is complete.
  */
-import { DEFAULT_RULESET, GEN_VERSION, requireRuleset } from '@traveller-mainworld/core';
+import {
+  DEFAULT_RULESET,
+  GEN_VERSION,
+  knownGeneratorVersions,
+  requireRuleset,
+} from '@traveller-mainworld/core';
 
 import { type SunDirection, formatSun } from '../render/sun.js';
 
@@ -153,24 +157,47 @@ export function cameraFrom(params: URLSearchParams): CameraPose | undefined {
 }
 
 /**
- * Check `?gen=` against what this build can produce.
+ * Resolve `?gen=` against the versions this build can render.
  *
- * @param current Defaults to this build's {@link GEN_VERSION}. Passed
- *                explicitly by the tests, so they do not go quiet the moment
- *                the version is bumped — a version check whose test pins the
- *                same constant it checks is a test of one string against itself.
+ * A **lookup** since WP14, where it used to be an equality test against
+ * `GEN_VERSION` with a comment saying the registry was coming. The registry is
+ * `generatorFor` in `core`, and this is the call site that makes it a seam that
+ * is exercised rather than one that is merely present — ADR-0001's lesson, and
+ * the reason the refusal below now names every version the build has rather
+ * than only the current one.
+ *
+ * What did not change is the refusal itself. There is one entry, so an unknown
+ * `?gen=` is still an error rather than a fallback, and it must stay one: a
+ * link that opens and renders *a different world at the same address* is the
+ * failure R15 exists to prevent, and it is far worse than a link that says it
+ * cannot be opened. When a second entry lands, this function starts returning
+ * something other than the current version and the caller has to resolve it
+ * through `generatorFor` rather than assuming — which is why it returns the
+ * version rather than a boolean.
+ *
+ * @param known Defaults to the registry. Passed explicitly by the tests, so
+ *              they do not go quiet the moment the version is bumped — a
+ *              version check whose test pins the same constant it checks is a
+ *              test of one string against itself.
  */
-export function checkGenVersion(params: URLSearchParams, current: string = GEN_VERSION): string {
+export function checkGenVersion(
+  params: URLSearchParams,
+  known: readonly string[] = knownGeneratorVersions(),
+): string {
+  const current = known[0] ?? GEN_VERSION;
   const asked = params.get('gen');
-  if (asked === null || asked === current) {
+  if (asked === null) {
     return current;
   }
+  if (known.includes(asked)) {
+    return asked;
+  }
   throw new Error(
-    `?gen=${asked} asks for generator version ${asked}, and this build produces ${current}. ` +
-      'Rendering it with the current generator would show a world that is not the one the link ' +
-      'promised, so it is refused instead. The version registry that will make older versions ' +
-      'renderable (PRD R15) is WP14; nothing has been released, so no share URL of an earlier ' +
-      'version should exist.',
+    `?gen=${asked} asks for generator version ${asked}, and this build produces: ` +
+      `${known.join(', ')}. Rendering it with a different generator would show a world that is ` +
+      'not the one the link promised, so it is refused instead. Nothing has been released ' +
+      '(PRD §7), so no share URL of an earlier version should exist — see PRD R15 and ' +
+      '`packages/golden/archive/` for what earlier versions produced.',
   );
 }
 

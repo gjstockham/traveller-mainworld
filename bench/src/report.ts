@@ -245,11 +245,23 @@ export function renderReport(r: ReportInput): string {
   p('## Crater pass (Phase-1 cost model)');
   p();
   p(
-    'Phase 0 has no craters. §B.1 nonetheless specifies them as part of the representative ' +
-      'tile, so `bench/src/craters.ts` does the work a crater pass does — cell-hashed placement ' +
-      'over a fixed face subdivision, compact-support profile compositing — to show how much ' +
-      'headroom the fBm pass leaves. **It is a cost model, not a proposed algorithm, and it ' +
-      'cannot affect a golden hash.**',
+    'Written for Phase 0, which had no craters: §B.1 specifies them as part of the ' +
+      'representative tile, so `bench/src/craters.ts` does the work a crater pass does — ' +
+      'cell-hashed placement over a fixed face subdivision, compact-support profile ' +
+      'compositing — to show how much headroom the fBm pass leaves. **It is a cost model, not ' +
+      'a proposed algorithm, and it cannot affect a golden hash.**',
+  );
+  p();
+  p(
+    '**Since WP10 it is no longer the crater cost, and the tile row above is no longer ' +
+      'fBm-only.** `TsTileGenerator.generate` runs the real two-tier crater pass and the ' +
+      'regolith pass inline, so the single-tile figure is already a whole Phase-1 tile. This ' +
+      'section measures a *separate synthetic implementation* of a similar workload, and until ' +
+      'WP14 the summary below added the two together — double-counting a pass, and labelling ' +
+      'the tile row "fBm" when it had not been that for four work packages. The numbers were ' +
+      '0.6 ms apart so no verdict moved, which is exactly why it survived. Kept for now ' +
+      'because comparing an independent implementation against the shipped one is worth ' +
+      'something to WP15; it should be either retargeted or deleted there.',
   );
   p();
   p('| Grid | Median ms/tile | Cells visited | Craters placed | Vertex updates |');
@@ -265,11 +277,16 @@ export function renderReport(r: ReportInput): string {
   p();
   const cr128 = r.craters.find((c) => c.n === 128);
   if (ts128 && cr128) {
-    const total = ts128.timing.msPerOp + cr128.timing.msPerOp;
     p(
-      `Full Phase-1 tile estimate at 129²: **${ms(total)} ms** ` +
-        `(${ms(ts128.timing.msPerOp)} fBm + ${ms(cr128.timing.msPerOp)} craters). ` +
-        `${verdict(total, BUDGET.tileMs, true)}`,
+      `Full Phase-1 tile at 129²: **${ms(ts128.timing.msPerOp)} ms** — the single-tile row ` +
+        'above, craters and regolith included, measured rather than summed. ' +
+        `${verdict(ts128.timing.msPerOp, BUDGET.tileMs, true)}`,
+    );
+    p();
+    p(
+      `The standalone cost model costs ${ms(cr128.timing.msPerOp)} ms at the same grid. It is ` +
+        '**not** added to the figure above; it is a second implementation of a pass already ' +
+        'inside it.',
     );
     p();
   }

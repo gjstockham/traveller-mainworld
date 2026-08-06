@@ -1,0 +1,89 @@
+{
+  "genVersion": "0.1.0",
+  "fixtureSpecHash": "289a78e59ada7f5bab4a7c26c99ae5af580b9e95fbcdca033dd02f499e0c701c",
+  "fixtureN": 128,
+  "tileCount": 90,
+  "digest": "9c0f860316158247bfd1d58523cb8212b3b0faef6cd8cbb4f46265c9f9217387",
+  "fixtures": {
+    "size1-rockball": {
+      "elevation": "a60cdcc1715d868762d6e1a38bc3a454c681a9742a71ba3c012567e1aa5476bc",
+      "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
+      "materials": "52b6f541275fe8bfe7958b73031424b11b707cde42af4b82c519bbabc80286f3",
+      "tiles": 90,
+      "vertices": 1497690,
+      "waterMaskAllZero": true
+    },
+    "size2-cinder": {
+      "elevation": "320d1b2a1c2430a6782fde408a192338883486c9f4c6c918b289f4d7238cd8ac",
+      "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
+      "materials": "f208ee0848f5925dbc20c9b36703c53f0d4c52ea656045142385512b769721ec",
+      "tiles": 90,
+      "vertices": 1497690,
+      "waterMaskAllZero": true
+    },
+    "size3-ceres": {
+      "elevation": "cf44604de86cf3c4b253aba8518cfc67cab716146c5564cbbbaa71cd45d703ba",
+      "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
+      "materials": "26c1efe736a9577e54a3ce21110c61f17da0b23e92c9de918d5a820d5c36fee0",
+      "tiles": 90,
+      "vertices": 1497690,
+      "waterMaskAllZero": true
+    },
+    "size4-luna": {
+      "elevation": "6289166ea17f812ae65dbc1c351a6309ae5e12713990330373fe7b265d902dd5",
+      "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
+      "materials": "3779504df7baf23ea8196517bed7b3a0912a6e4140618e70cb0389249067566e",
+      "tiles": 90,
+      "vertices": 1497690,
+      "waterMaskAllZero": true
+    },
+    "size5-mercury": {
+      "elevation": "15e801617b5fe6be55438059c488de857b6e6398cc35eb8b7fa8fba2c583ff48",
+      "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
+      "materials": "0341fa6feb373be2361f37aef6e7b76a093c5de479311e00561ddd9490ab8019",
+      "tiles": 90,
+      "vertices": 1497690,
+      "waterMaskAllZero": true
+    },
+    "size6-mars": {
+      "elevation": "dff8d00fb1711d546741044b4ba2eb0dab6b4d227a0ddc9b91fe4e0a2bc2d187",
+      "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
+      "materials": "3c805d0b21fec513a18a015f80694b0cb6903121df871cd7a6f7703c3cdc2b3b",
+      "tiles": 90,
+      "vertices": 1497690,
+      "waterMaskAllZero": true
+    },
+    "size7-temperate": {
+      "elevation": "fb31033747aa94e1cb78b6d90a988d71cea7e0d19f6841dd409d497b5d2bbe9f",
+      "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
+      "materials": "fff88a2f355b441c701342b6cddb51efa89a0f45404091081ae94fb118af2296",
+      "tiles": 90,
+      "vertices": 1497690,
+      "waterMaskAllZero": true
+    },
+    "size8-earthlike": {
+      "elevation": "3dcdbb402281ea23abd8246bbf84e0f020fb49f8797de02a75f784a861e3d57d",
+      "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
+      "materials": "e8b7166111b7a1d1541b6850422eebbaa2e54d67580f8930da12c9c3386f746d",
+      "tiles": 90,
+      "vertices": 1497690,
+      "waterMaskAllZero": true
+    },
+    "size9-large": {
+      "elevation": "0f4b9790edb4e3f5115f3c2d963e7df7934d52adca0877b7bcdae0a19006a982",
+      "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
+      "materials": "7998bd28bdf4168bfe6661aa2815972ccb40df44ba0266152ad6a5766b1c0da0",
+      "tiles": 90,
+      "vertices": 1497690,
+      "waterMaskAllZero": true
+    },
+    "sizeA-maximal": {
+      "elevation": "f9ef6c13cb8d3a3809202aae05a504861fd3ce1c120732fa8870b1f81c1a2f0e",
+      "waterMask": "7397adc07cacad415a578ac56e8c9394b288dd44f6e59fd41ced369d7346fe9e",
+      "materials": "57c775fa7457e828762fc7be8828790e600b44dac7b5a72bc46a8ce0eba8d03b",
+      "tiles": 90,
+      "vertices": 1497690,
+      "waterMaskAllZero": true
+    }
+  }
+}

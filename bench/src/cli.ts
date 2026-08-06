@@ -2,10 +2,17 @@
  * Spike B runner.
  *
  *   pnpm bench           full run, writes bench/results/phase0.md
- *   pnpm bench:quick     reduced iterations, for checking the harness
+ *   pnpm bench:quick     reduced iterations, writes bench/results/phase0-quick.md
  *
  * Run it on an idle machine. Median and p95 absorb a certain amount of
  * interference, but nothing absorbs a compile running on the other four cores.
+ *
+ * **The two runs write to different files, since WP14.** They did not, and a
+ * `pnpm bench:quick` on the wrong machine silently overwrote the committed
+ * Phase 0 results with three-iteration numbers — recoverable only because
+ * `git status` happened to be read afterwards. The report labels a quick run in
+ * its own header, which is the right warning for someone reading the file and
+ * no warning at all for the working tree. The quick path is gitignored.
  */
 import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -21,10 +28,11 @@ import { renderReport, type ReportInput } from './report.js';
 import { benchCraters, benchGlobalPass, benchTileGeneration } from './tile.js';
 import { GRID_SIZES } from './workloads.js';
 
-const RESULTS_PATH = join(dirname(fileURLToPath(import.meta.url)), '../results/phase0.md');
+const RESULTS_DIR = join(dirname(fileURLToPath(import.meta.url)), '../results');
 
 async function main(): Promise<void> {
   const quick = process.argv.includes('--quick');
+  const resultsPath = join(RESULTS_DIR, quick ? 'phase0-quick.md' : 'phase0.md');
   const iterations = quick ? 3 : 15;
   const poolIterations = quick ? 2 : 6;
   const poolTiles = quick ? 24 : 96;
@@ -102,9 +110,9 @@ async function main(): Promise<void> {
     sink: sink.value,
   };
 
-  writeFileSync(RESULTS_PATH, renderReport(input));
+  writeFileSync(resultsPath, renderReport(input));
   log('');
-  log(`Wrote ${RESULTS_PATH}`);
+  log(`Wrote ${resultsPath}`);
 
   // The headline numbers, so a run says something without opening the file.
   const ts128 = tiles.find((t) => t.kernel === 'typescript' && t.n === 128);

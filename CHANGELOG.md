@@ -30,6 +30,146 @@ above is the copy that is, and the README repeats it.
 
 ---
 
+## 0.2.0 — WP14: the golden harness under Phase 1
+
+**Two identities moved, for two different reasons, and the difference is the
+whole point of there being two of them.**
+
+| Identity | From | To | Why |
+|---|---|---|---|
+| `GEN_VERSION` | `0.2.0-alpha.4` | `0.2.0` | The prerelease sequence landing. No arithmetic changed in this work package. |
+| Fixture set | `4f23f0304c09635f…` | `fb5a446ea46f2bb6…` | The fixture worlds are now interpreted wholly from UPPs. |
+
+Both manifests are regenerated. `manifest.json`'s digest moves for a **third**
+reason that is neither of the above — a new battery case — and it is called out
+below rather than left for someone to attribute to the version bump.
+
+### `GEN_VERSION → 0.2.0` — a release, not a change
+
+Nothing in `packages/core/src/kernel/**` changed in WP14. The version moves
+because `0.2.0-alpha.1` … `-alpha.4` were prereleases carrying WP10 through
+WP13's output changes, bumped once per re-pin so that six sessions of
+in-progress work did not mint six versions that never existed for anyone.
+`0.2.0` is that sequence landing.
+
+It is not a fifth alpha with a shorter name. **It is the first version that will
+be treated as immutable**, because `generatorFor` is now what an old share URL
+resolves through, and a version re-cut under the same name is exactly the
+failure R15 exists to prevent. From here, an output change costs a real version
+number.
+
+### The fixture set — regenerated from UPPs
+
+Every hash in `fixtures.json` moved. Ten `(UPP, ruleset, seed)` triples, Size 1
+to A, Atmosphere 0–1, Hydrographics 0, and **the seed column did not move**, so
+the diff is attributable to the spec change alone.
+
+What actually changed is that the fBm override is gone. Since WP9 each fixture
+interpreted a UPP and then replaced its fBm block with a hand-written one, which
+bought test-input diversity and cost the thing the fixture set is for: the
+manifest pinned ten worlds the shipping path cannot reach, while the path a user
+*can* reach — paste a UPP, get a planet — was pinned nowhere. `packages/export`
+felt it first; its tests reach for `FIXTURES`, so an export of a fixture was an
+export of something no UPP produces.
+
+**The diversity moved rather than vanishing.** `cepheus-1` gives every world
+lacunarity 2 and gain 0.5, so the awkward lanes — gain either side of 0.5,
+non-dyadic lacunarity, octave counts to the clamp — would simply have stopped
+being covered. They are now `battery.ts`'s `noise.fbm3.params` case, the same
+ten parameter blocks verbatim, each over a hundred thousand adversarial
+coordinates rather than one world's tiles. That is the artefact hostile inputs
+always belonged in, and it is why the battery digest moves.
+
+The diff splits the ten cleanly, and reading it is worth a minute: **all ten
+`elevation` hashes moved, but only four `materials` and `albedo` hashes did** —
+the four that gained an Atmosphere digit. Albedo and materials are functions of
+the crater and province fields and do not read the fBm terrain at all, which is
+WP11's depth-invariant design showing up in the manifest. The practical
+consequence is that an fBm regression is caught by `elevation` alone; three
+hashed buffers are not three independent checks of everything.
+
+Atmosphere 0 and 1 both appear, at both ends of the size range. Not decoration:
+`interpret` computes `craters.densityScale` as `craterPreservation × (1 −
+hydrographics)`, so an Atmo-1 world is a genuinely different crater field —
+0.95 against 1.0 — with a different `regolithMaturity` behind it.
+
+### Spec hashing — the R7 enforcement (plan §4.3)
+
+The fixture-spec hash now covers the **UPP, the ruleset id, the seed and the
+whole interpreted spec**, through `core`'s own `serialiseSpec`. A `cepheus-1`
+table edit moves it, and `fixtureManifestPreflight` refuses the comparison
+before a single tile is generated, naming the fixture set rather than reporting
+forty changed buffer hashes. Each fixture also carries its own `specHash` in
+`fixtures.json`, so a ruleset change reads as a list of which worlds it altered
+— and a kernel change reads as none of them moving while every buffer hash does.
+Those two are indistinguishable from the aggregate alone.
+
+A consequence worth stating: a field that reaches no tile is hashed anyway.
+Editing `atmosphere.pressureBar` today moves this hash while every buffer hash
+stays put. That is the intended reading — the fixture identity is what the
+interpreter produced, not the subset this phase consumes.
+
+### What the albedo hash pins, decided rather than inherited
+
+`albedo` joined the per-buffer hashes in WP11. WP14 is where it became a claim
+CI makes, so the claim is written down: **it pins the byte, not the scalar
+behind it.** One albedo byte is 1/255 and reordering a float sum moves it by
+~1e-16, so a compositing-order change that reddens `elevation` instantly is
+invisible here. That is not a defect and not a promise: an albedo change smaller
+than 1/255 everywhere is a change this manifest will call clean, and the buffer
+making the bit-stability claim is `elevation`, hashed as `Float64` on the same
+tiles in the same run. Pinning the scalar was considered and rejected — a second
+hashed buffer of a quantity nothing renders, to catch what `elevation` already
+catches.
+
+### `fbm.amplitude` decides nothing — found by the new check, on its first run
+
+The partition test over spec fields now runs in **both** directions: every field
+listed as reaching no hashed buffer must move none, *and* every field not listed
+must move one. The second half is new, and it immediately caught a field nobody
+had questioned.
+
+`fbm.amplitude` cancels. The tile pass computes `terrainAmplitudeM /
+fbmNormalisation(fbm)`, and both the fBm sum and that normalisation are
+homogeneous of degree 1 in amplitude. Measured: amplitudes of 0.25, 0.5, 2 and
+1024 give **byte-identical** tiles, because a power of two scales every partial
+product exactly; 0.3 differs by at most **1.4e-12 m** on elevations spanning
+±3.8 km. `terrainAmplitudeM` is the real relief control and always was.
+
+It stays hashed, because the fixture identity is the whole spec and carving out
+exceptions is how a serialiser stops matching what it serialises. It is recorded
+as `inert` rather than `pending`, since no phase will consume it.
+
+**And it is the halving trap from the other side.** This repo's standing warning
+is that a one-ulp perturbation is too weak to probe generation, so the probe
+halves instead — and halving is exact in binary floating point, so for the one
+scale-invariant field in the spec, the deliberately-strong probe is the one
+probe guaranteed to move nothing.
+
+### The generator registry (R15, plan §9.5)
+
+`generatorFor(version)` in `core`, with one entry and a refusal that names every
+version the build has. `?gen=` in the viewer is a **lookup** now rather than an
+equality test against `GEN_VERSION`, which is what makes it a seam that is
+exercised rather than one that is merely present. Nothing has been released, so
+0.1.0's implementation is not retained; its manifests are archived under
+`packages/golden/archive/` instead, which is the only record of what Phase 0
+produced.
+
+### Also
+
+- **A 129² Phase-1 tile costs 90.2 ms** on this machine — 90% of the ADR-0001 R4
+  trigger, with pool throughput at 29.0 tiles/s against a floor of 25. WSL2, not
+  the minimum-target laptop, and a `--quick` run: **indicative, not evidence.**
+  WP15 owns the real measurement. See `docs/evidence/wp14-golden.md` §6.
+- **The bench report was adding the crater pass twice.** Its "Full Phase-1 tile
+  estimate" summed the measured tile against a standalone crater cost model
+  written when `generate` was fBm-only — the crater pass has been inside the
+  measured tile since WP10. The sum was 0.6 ms out and the label was wrong by a
+  whole pass; both are fixed, because WP15 reads this line to decide a kernel.
+- **`pnpm bench:quick` overwrote the committed Phase 0 results.** A quick run now
+  writes `phase0-quick.md`, which is gitignored.
+
 ## Unreleased — WP13 follow-up: the Windows CI leg
 
 **No identity moved; no source file changed.** Test budgets only.

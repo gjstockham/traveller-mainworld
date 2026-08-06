@@ -1,6 +1,6 @@
 {
-  "genVersion": "0.2.0",
-  "digest": "1629e5221565ff94f825f15af008ea8911c7b6f1001596b14c6520074cece58a",
+  "genVersion": "0.1.0",
+  "digest": "0c6181a006c94e6173d93e842a77736015f7ccf49cdb6a3abf707ad47f08bdf7",
   "cases": {
     "ops.powi3": {
       "hash": "8b15f5e1d718cfd41a4b4d5c53b6b6a56888cc87bdec2611b932895b5256582c",
@@ -78,17 +78,13 @@
       "hash": "896804876f3f48d4ffae6edf43b5bb8e4f67166acb746f74948acb54ac0d36ee",
       "samples": 1000000
     },
-    "noise.fbm3.params": {
-      "hash": "fa3f4a262aae47110cdee0453589f436ba8ad93ae7698c6c4662db70ec6e8f07",
-      "samples": 1000000
-    },
     "geometry.faceUvToDirection": {
       "hash": "ffeba6b51ed349eb464f72089b8d43efa4e2bd223d401454c1e3c38813e919c7",
       "samples": 1002528
     },
     "tile.composite": {
-      "hash": "dfafcd293b6f9009ef8fdbcabd4cc4943dd8ed1d5c1239468c45c1e866644404",
-      "samples": 2096766
+      "hash": "a200deef2fff84680a7a91eaea5b6d2ab9f34e219c7d56810bb95878d3c3a56f",
+      "samples": 1397844
     }
   }
 }
