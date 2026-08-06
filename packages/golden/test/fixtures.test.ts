@@ -248,7 +248,11 @@ describe('the fixture-spec hash', () => {
 
   it('moves when the tile set or grid size changes', () => {
     expect(fixtureSpecHash(FIXTURES, buildFixtureTiles(5))).not.toBe(fixtureSpecHash());
-    expect(fixtureSpecHash(FIXTURES, FIXTURE_TILES, 64)).not.toBe(fixtureSpecHash());
+    // Relative to `FIXTURE_N`, not a literal. This assertion was written with a
+    // hard-coded 64 when the fixtures hashed at 128, and it silently became
+    // `x !== x` the moment WP15 moved the grid — a test that had asserted the
+    // property was there to catch the very change that broke it.
+    expect(fixtureSpecHash(FIXTURES, FIXTURE_TILES, FIXTURE_N * 2)).not.toBe(fixtureSpecHash());
   });
 
   it('does not move when a description changes', () => {

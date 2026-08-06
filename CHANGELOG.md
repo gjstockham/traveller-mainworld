@@ -30,6 +30,81 @@ above is the copy that is, and the README repeats it.
 
 ---
 
+## Unreleased — WP15: the hashed grid moves to 65²
+
+**One identity moved, and it is deliberately not `GEN_VERSION`.**
+
+| Identity | From | To | Why |
+|---|---|---|---|
+| Fixture set | `fb5a446ea46f2bb6…` | `3c780fc0b3d351e5…` | `FIXTURE_N` 128 → 64. The fixtures now hash the grid the viewer draws. |
+
+`GEN_VERSION` stays at `0.2.0`. **Nothing in `packages/core/src/kernel/**` changed
+in this work package** — not a constant, not a line. The generator computes
+exactly what it computed yesterday for exactly the same inputs, and every world
+any user can reach is untouched, including every share URL already emitted. What
+changed is *which points of that unchanged field the manifest samples*.
+
+This is the case the two-identity design was built for, and `fixtureSpecHash`
+already covered it: the fixture-spec hash is defined over the fixture specs,
+their seeds, the tile set **and the grid size**, precisely so that re-pinning a
+different sampling does not mint a generator version nobody could ever have
+generated with. `fixtureManifestPreflight` refuses to compare hashes across a
+grid change rather than reporting a mismatch it cannot interpret, so the failure
+mode here is a clear message and not a false regression.
+
+### Why it moved — the shipped path was not the hashed path
+
+Open question 1, open since Phase 0 §10, was which grid the tool is *for*. It has
+had two answers at once since WP1: the golden fixtures hashed generation at 129²
+while `viewer/src/main.ts` meshed at 65². Every determinism claim in this
+repository was therefore a claim about a grid the application never drew at. That
+is not a wrong claim, but it is a claim about the wrong thing, and it would have
+quietly weakened Phase 1's exit evidence.
+
+WP15 measured it and closed it at **65²** — `bench/results/phase1.md` §Grid size
+has the argument and the numbers. The short version is that the case for 129²
+rested on a premise that is false in the viewer as built:
+
+- `lod/quadtree.ts`'s `screenSpaceError` is the sagitta of a tile's bounding cap
+  against the sphere and **does not read the grid resolution**. So the same cut
+  of the quadtree is chosen either way: a 129² mesh does not replace four 65²
+  tiles with one, it draws the same tiles with four times the vertices.
+- `bandsForDepth` gates crater bands on `BAND_GATE_N = 64`, a reference sample
+  spacing rather than the caller's grid, and fBm octaves come from the ruleset
+  per world rather than per depth. **Both grids sample an identical field.**
+
+So 129² cost 3.8× the generation for no additional detail, and it was the only
+one of the two that exceeded the R13 budget on its worst tile. Buying the detail
+would mean raising `BAND_GATE_N`, which *is* in the whitelisted zone and would
+cost a real version bump on top of a larger tile.
+
+### What did not change
+
+- **The determinism battery stays at 129²** (`battery.ts`, `tile.composite`). It
+  answers a different question — whether two engines agree on the arithmetic —
+  where a finer sampling is strictly more discriminating and no claim about the
+  shipped grid is implied. Moving it would have moved `manifest.json`'s digest
+  under an unchanged `GEN_VERSION`, which the protocol rightly forbids.
+- **The viewer.** `TILE_N` was already 64; its comment deferring to Spike B is
+  now a record of the decision instead.
+- **The exporter.** `detailDepthFor` was written against `referenceSpacing` and
+  `BAND_GATE_N` rather than a literal grid size (WP13, on purpose), so it follows
+  this without an edit.
+
+### Also
+
+- `bench/src/craters.ts` is **deleted**. It was a cost model for a crater pass
+  that did not exist when it was written; the real two-tier pass has run inside
+  `TsTileGenerator.generate` since WP10, and keeping a second implementation
+  alongside the shipped one is how the Phase 0 summary came to add a pass to a
+  figure that already contained it. What replaces it measures the shipped pass by
+  differential — the same tile at `densityScale` 1.0, 0.5 and 0.
+- `pnpm bench` now writes `bench/results/phase1.md` and **refuses `--phase=0`**.
+  `phase0.md` is WP5's record of a machine, a generator and a tile that no longer
+  exist; ADR-0001 §E2 cites it, and nothing reproduces it.
+
+---
+
 ## 0.2.0 — WP14: the golden harness under Phase 1
 
 **Two identities moved, for two different reasons, and the difference is the

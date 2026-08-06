@@ -250,11 +250,20 @@ export function lodStepBound(depth: number): number {
  * it would turn Phase 1 open question 1 (65² vs 129²) from an open question into
  * a defect.
  *
- * 64 rather than 128 because it errs toward evaluating *fewer* bands: the 129²
- * hashed path then samples the same craters more finely, which costs nothing,
- * whereas calibrating at 128 would leave the 65² viewer aliasing craters it
- * cannot resolve. If WP15 moves the viewer to 129², raising this is a deliberate
- * output change under the change protocol.
+ * 64 rather than 128 because it errs toward evaluating *fewer* bands: a path
+ * that samples more finely than the gate assumes simply resolves the same
+ * craters better, which costs nothing, whereas calibrating at 128 would leave a
+ * 65² grid aliasing craters it cannot resolve.
+ *
+ * **WP15 closed open question 1 at 65², and this constant is most of the reason
+ * why.** Because the gate is calibrated here rather than at the caller's grid, a
+ * 129² mesh samples exactly the field a 65² one does — four times the vertices,
+ * not one extra crater. So the larger grid was 3.8× the generation cost for no
+ * additional detail. Buying that detail means raising this to 128, and this is
+ * inside the whitelisted zone: every hash in the repository moves and
+ * `GEN_VERSION` moves with them. It is a deliberate output change under the full
+ * change protocol, and it would raise a tile cost that already exceeds the R13
+ * budget at 129² on its worst tile. See `bench/results/phase1.md` §Grid size.
  */
 export const BAND_GATE_N = 64;
 

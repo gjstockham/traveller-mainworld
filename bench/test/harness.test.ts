@@ -9,18 +9,35 @@
  * them looked wrong in the table. These tests pin the properties that would
  * have caught them.
  */
-import { TsTileGenerator, allocateTileOutput, makeTileId, tileBounds, tileChild, tileFace } from '@traveller-mainworld/core';
+import {
+  TsTileGenerator,
+  allocateTileOutput,
+  bandsForDepth,
+  faceUvToDirection,
+  fbm3,
+  fbmNormalisation,
+  makeTileId,
+  tileBounds,
+  tileDepth,
+  tileFace,
+} from '@traveller-mainworld/core';
 import { describe, expect, it } from 'vitest';
 
-import {
-  DEFAULT_CRATER_BANDS,
-  bandIsResolvable,
-  compositeCraters,
-  globalCraterPass,
-} from '../src/craters.js';
 import { bytes, ms, time } from '../src/harness.js';
 import { footprint } from '../src/memory.js';
-import { BENCH_FBM, BENCH_WORLD, benchTiles, renderBytes, tileBytes, vertexCount } from '../src/workloads.js';
+import { DEFAULT_PHASE, resolveOutput } from '../src/output.js';
+import { benchBasins, benchByDepth, benchDensity } from '../src/tile.js';
+import {
+  BENCH_DENSITY,
+  BENCH_FBM,
+  BENCH_WORLD,
+  benchTiles,
+  renderBytes,
+  tileBytes,
+  tilesAtDepth,
+  vertexCount,
+  worldAtDensity,
+} from '../src/workloads.js';
 
 describe('timing harness', () => {
   it('reports a cost that tracks the actual work', () => {
@@ -106,87 +123,142 @@ describe('tile footprint arithmetic', () => {
   });
 });
 
-describe('crater cost model', () => {
+describe('the crater density differential', () => {
+  // WP15 replaced Phase 0's standalone crater cost model — a second
+  // implementation of a similar workload — with a differential across
+  // `densityScale` on the shipped generator. The whole measurement rests on one
+  // claim: that the zero arm has no craters in it. These tests are that claim.
   const n = 32;
+  const id = makeTileId(0, 5, 300);
 
-  function crateredEdge(tileId: number, edge: 'right' | 'left'): number[] {
-    const b = tileBounds(tileId);
+  function elevationAt(densityScale: number): number[] {
     const out = allocateTileOutput(n);
-    new TsTileGenerator('bench').generate(tileId, BENCH_WORLD, n, out);
-    compositeCraters(out, tileFace(tileId), b.u0, b.v0, b.size, n, BENCH_WORLD.spec.terrainAmplitudeM);
-    const col = edge === 'right' ? n : 0;
-    const values: number[] = [];
-    for (let j = 0; j <= n; j++) values.push(out.elevation[j * (n + 1) + col]!);
-    return values;
+    new TsTileGenerator('bench').generate(id, worldAtDensity(densityScale), n, out);
+    return Array.from(out.elevation);
   }
 
-  it('is seam-free across a tile boundary', () => {
-    // The property that makes cell-hashed placement the right *shape* for a
-    // cost model. Drawing craters from a per-tile RNG stream would be cheaper
-    // to write and faster to run, and would put a cliff along every tile edge —
-    // so a model built that way would be measuring the wrong algorithm.
-    const parent = makeTileId(2, 3, 21);
-    const left = tileChild(parent, 0); // lower-left quadrant
-    const right = tileChild(parent, 1); // lower-right, sharing left's right edge
+  it('leaves exactly the base terrain field at density 0', () => {
+    // Not "smaller" or "smoother" — equal, to the bit, to the fBm pass alone.
+    // Anything the acceptance hash let through would show up here, and a
+    // differential whose baseline still contains craters understates them.
+    const { u0, v0, size } = tileBounds(id);
+    const face = tileFace(id);
+    const { fbm, terrainAmplitudeM } = BENCH_WORLD.spec;
+    const seed = (BENCH_WORLD.seedLo ^ Math.imul(BENCH_WORLD.seedHi, 0x9e3779b1)) | 0;
+    const norm = fbmNormalisation(fbm);
+    const scale = norm === 0 ? 0 : terrainAmplitudeM / norm;
 
-    const a = crateredEdge(left, 'right');
-    const b = crateredEdge(right, 'left');
-    expect(b).toEqual(a);
+    const expected: number[] = [];
+    for (let j = 0; j <= n; j++) {
+      for (let i = 0; i <= n; i++) {
+        const d = faceUvToDirection(face, u0 + (i / n) * size, v0 + (j / n) * size);
+        expected.push(fbm3(d.x, d.y, d.z, seed, fbm) * scale);
+      }
+    }
+
+    expect(elevationAt(0)).toEqual(expected);
   });
 
-  it('is deterministic', () => {
-    const id = benchTiles(1)[0]!;
-    expect(crateredEdge(id, 'right')).toEqual(crateredEdge(id, 'right'));
+  it('measures a difference at all', () => {
+    // The failure this guards is the one Phase 0's model hit from the other
+    // side: a pass that silently does nothing looks like excellent performance.
+    // If the two arms were equal the differential would report craters as free.
+    expect(elevationAt(BENCH_DENSITY)).not.toEqual(elevationAt(0));
   });
 
-  it('actually modifies the terrain', () => {
-    // Guards the case where every band is skipped as unresolvable and the pass
-    // silently becomes free — which is what the first version of this model did
-    // at shallow depths, and it looked like excellent performance.
-    const id = makeTileId(0, 5, 300);
-    const b = tileBounds(id);
-    const out = allocateTileOutput(n);
-    new TsTileGenerator('bench').generate(id, BENCH_WORLD, n, out);
-    const before = Array.from(out.elevation);
-    const stats = compositeCraters(out, 0, b.u0, b.v0, b.size, n, 8000);
-
-    expect(stats.cratersPlaced).toBeGreaterThan(0);
-    expect(stats.vertexUpdates).toBeGreaterThan(0);
-    expect(Array.from(out.elevation)).not.toEqual(before);
+  it('holds everything but the density fixed', () => {
+    const world = worldAtDensity(0.25);
+    expect(world.spec.craters.densityScale).toBe(0.25);
+    expect(world.seedHi).toBe(BENCH_WORLD.seedHi);
+    expect(world.seedLo).toBe(BENCH_WORLD.seedLo);
+    expect(world.spec.fbm).toEqual(BENCH_WORLD.spec.fbm);
+    expect(world.spec.radiusKm).toBe(BENCH_WORLD.spec.radiusKm);
+    expect(world.spec.craters.transitionDiameterKm).toBe(
+      BENCH_WORLD.spec.craters.transitionDiameterKm,
+    );
+    expect(world.spec.craters.regolithMaturity).toBe(BENCH_WORLD.spec.craters.regolithMaturity);
   });
 
-  it('skips bands finer than the vertex spacing, and keeps coarser ones', () => {
-    const fine = DEFAULT_CRATER_BANDS[DEFAULT_CRATER_BANDS.length - 1]!;
-    const coarse = DEFAULT_CRATER_BANDS[0]!;
-    // A depth-0 tile spans the whole face: one vertex per 1/128 of it.
-    expect(bandIsResolvable(fine, 1, 128)).toBe(false);
-    expect(bandIsResolvable(coarse, 1, 128)).toBe(true);
-    // A depth-6 tile spans 1/64 of the face, where the fine band is resolvable.
-    expect(bandIsResolvable(fine, 1 / 64, 128)).toBe(true);
+  it('benchmarks the saturated case, and says so', () => {
+    // `X800000-0` is Atmosphere 0. If the ruleset ever interprets it to
+    // something less than saturated, the results file's "this is the expensive
+    // case" paragraph becomes false and nothing else would notice.
+    expect(BENCH_DENSITY).toBe(1);
   });
+});
 
-  it('keeps cell counts bounded at every depth', () => {
-    // The bug this model started with: without the resolvability gate, a
-    // depth-0 tile visited 2048² cells of the finest band — four million hash
-    // lookups for features a thousand times smaller than a vertex.
-    for (let depth = 0; depth <= 6; depth++) {
-      let path = 0;
-      for (let d = 0; d < depth; d++) path = path * 4 + 1;
-      const id = makeTileId(0, depth, path);
-      const b = tileBounds(id);
-      const out = allocateTileOutput(64);
-      const stats = compositeCraters(out, 0, b.u0, b.v0, b.size, 64, 8000);
-      expect(stats.cellsVisited, `depth ${depth}`).toBeLessThan(50_000);
+describe('the per-depth breakdown', () => {
+  it('puts one tile on every face at the depth asked for', () => {
+    for (const depth of [0, 3, 6]) {
+      const tiles = tilesAtDepth(depth);
+      expect(new Set(tiles.map(tileFace)).size, `depth ${depth}`).toBe(6);
+      expect(tiles.every((id) => tileDepth(id) === depth), `depth ${depth}`).toBe(true);
     }
   });
 
-  it('places a plausible number of craters in the global pass', () => {
-    const placed = globalCraterPass(64, 0.02);
-    const cells = 6 * 64 * 64;
-    // Within a factor of two of the requested density; the hash is uniform but
-    // this is a finite sample.
-    expect(placed).toBeGreaterThan(cells * 0.01);
-    expect(placed).toBeLessThan(cells * 0.04);
+  it('spans depths where the band gate actually moves', () => {
+    // The table is there to show cost rising with depth. If every depth it
+    // covered admitted the same number of bands, it would be six rows of the
+    // same measurement with a column that implies otherwise.
+    const bands = [0, 1, 2, 3, 4, 5, 6].map(bandsForDepth);
+    expect(bands[6]).toBeGreaterThan(bands[0]!);
+    for (let i = 1; i < bands.length; i++) {
+      expect(bands[i], `depth ${i}`).toBeGreaterThanOrEqual(bands[i - 1]!);
+    }
+  });
+});
+
+describe('the benchmarks measure what their parameters say', () => {
+  // Timings cannot carry this: a benchmark that ignored its own parameter would
+  // return three plausible, slightly different numbers and no other symptom.
+  // The checksums are what make it checkable without asserting on a duration.
+  it('generates a different world at each density', () => {
+    const sums = [1, 0.5, 0].map((d) => benchDensity(16, d, 1).checksum);
+    expect(new Set(sums).size, `checksums ${JSON.stringify(sums)}`).toBe(3);
+  });
+
+  it('generates a different tile set at each depth', () => {
+    const rows = benchByDepth(16, 3, 1);
+    expect(rows.map((r) => r.depth)).toEqual([0, 1, 2, 3]);
+    expect(new Set(rows.map((r) => r.checksum)).size).toBe(rows.length);
+  });
+});
+
+describe('the basin field measurement', () => {
+  it('places basins rather than timing an empty loop', () => {
+    const row = benchBasins(3);
+    expect(row.count).toBeGreaterThan(0);
+    expect(row.timing.medianMs).toBeGreaterThan(0);
+  });
+});
+
+describe('results path', () => {
+  it('defaults to the current phase, and separates quick runs', () => {
+    expect(resolveOutput([], '/r')).toEqual({ path: `/r/phase${String(DEFAULT_PHASE)}.md`, phase: DEFAULT_PHASE });
+    expect(resolveOutput(['--quick'], '/r').path).toBe(`/r/phase${String(DEFAULT_PHASE)}-quick.md`);
+  });
+
+  it('refuses to write phase0.md', () => {
+    // The file ADR-0001 §E2 cites, and the one WP14 nearly lost. A flag that
+    // targets it is a mistake every time: the tile it measured had no crater
+    // pass, so no run on this kernel reproduces it.
+    expect(() => resolveOutput(['--phase=0'], '/r')).toThrow(/refusing/);
+    expect(() => resolveOutput(['--phase=0', '--quick'], '/r')).toThrow(/refusing/);
+  });
+
+  it('lets an explicit --out through, including past the phase-0 guard', () => {
+    // A guard with no way past it is a guard someone deletes.
+    expect(resolveOutput(['--out=scratch.md'], '/r').path).toBe('/r/scratch.md');
+    expect(resolveOutput(['--phase=0', '--out=redo.md'], '/r')).toEqual({
+      path: '/r/redo.md',
+      phase: 0,
+    });
+  });
+
+  it('rejects a phase that is not a non-negative integer', () => {
+    expect(() => resolveOutput(['--phase=one'], '/r')).toThrow(/non-negative integer/);
+    expect(() => resolveOutput(['--phase=-1'], '/r')).toThrow(/non-negative integer/);
+    expect(() => resolveOutput(['--phase=1.5'], '/r')).toThrow(/non-negative integer/);
   });
 });
 

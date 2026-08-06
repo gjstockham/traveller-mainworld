@@ -204,6 +204,45 @@ platform's), and the machine runs under WSL2, where CPU-bound work is near-nativ
 but the browser legs should be measured on the Windows side. A 2.4× margin
 absorbs a good deal of both.
 
+**E2 is not regenerable and `pnpm bench` refuses to overwrite it** (WP15). It
+records a generator version, a machine state and a tile with no crater pass in
+it; nothing on the current kernel reproduces it. Phase 1's numbers are E2a.
+
+### E2a — Performance under Phase 1 (WP15)
+
+Source: [`bench/results/phase1.md`](../../bench/results/phase1.md), measured
+2026-08-06 on the same i7-1165G7 as E2. **This is the measurement R4 asks for**,
+and it replaces E2's crater *cost model* with the pass that actually ships —
+`TsTileGenerator.generate` has run the two-tier crater pass and the regolith pass
+inline since WP10, so E2's 41.7 ms "full Phase-1 tile estimate" was an estimate
+of a tile that did not exist yet.
+
+| Measurement | 65² | 129² | Budget (R13) |
+|---|---:|---:|---|
+| Single tile, averaged over depths 0–6 | 26.1 ms | 99.7 ms | ≤ 100 ms |
+| Single tile, worst depth (depth 0 at both) | **37.5 ms** | **122 ms** | ≤ 100 ms |
+| Pool throughput, 7 workers | 111.1 tiles/s | 30.8 tiles/s | ≥ 25 tiles/s |
+
+**R4 does not select WASM.** Throughput passes at both grids and is not close to
+the trigger. The tile figure passes on the average at 129² by 0.3%, which is a
+coincidence rather than a margin, and misses on the worst tile by **1.22×** —
+under the 2× that §A.3 row 2 escalates on, so the spike plan's own rule applies:
+*a miss by less than 2× says optimise the TypeScript*.
+
+**R4 is worded against 129² because Phase 0 expected open question 1 to land
+there. WP15 closed it at 65²**, where the worst tile is 37.5 ms and 2.7× inside
+budget. The trigger is deliberately **left as worded** — an ADR trigger rewritten
+to match the measurement it governs has stopped being a trigger — so a future
+`pnpm bench` at 129² will read it the same way this one did.
+
+**The WASM rows in `phase1.md` (6.2× at 129²) are not a like-for-like
+alternative and must not be quoted as one.** `crates/kernel-wasm` implements the
+base terrain field only — no crater pass, no regolith pass, no apron — which is
+why `golden:parity` skips `tile.composite` from WP10 onward. Most of that 6.2×
+is work the twin does not do. Should R4 ever fire at 2×, the twin is not a
+switch to throw: it is two passes and the rest of a phase, and E3's parity
+evidence covers neither of them.
+
 ### E3 — Mutual parity, TypeScript ↔ WASM (WP3)
 
 All 21 battery cases are bit-identical between the two kernels, on one platform
@@ -484,7 +523,7 @@ Amendment 2 rests on.
 | **R1** | ~~The nine `browser-matrix` cells run and M1–M3 are hand-checked.~~ **Discharged 2026-08-04 as amended** — twelve cells green on three OSes, M2 green on iOS Safari, M3 green on Android Chrome. **M1 was dropped from this trigger by [Amendment 2](#amendment-2-2026-08-04--r1-amended-and-this-adr-promoted), not satisfied by it.** | ~~All green:~~ §A.3 row 1 is satisfied **as amended**, and this ADR is **Accepted**. Divergence handling moves to R6, which is permanent. |
 | **R2** | The `wasm-parity` workflow fails, or has not run in a quarter. | The mutual-parity evidence has expired. Run `pnpm check:parity`, establish whether the twin is stale or the kernel has changed, and repair the twin — it is the only check that two independent implementations agree. |
 | **R3** | A new generator feature needs an operation the whitelist bans, and no polynomial approximation over whitelisted ops is practical. | The whitelist is no longer sufficient to carry the determinism promise, which is the foundation this decision rests on. Reopen. |
-| **R4** | `pnpm bench` shows the 129² Phase-1 tile exceeding 100 ms, or pool throughput below 25 tiles/s, on the minimum target. | §A.3 row 2 applies: WASM on performance grounds. The 2.4× margin is what makes this unlikely, not impossible — Phase 1 adds passes. |
+| **R4** | `pnpm bench` shows the 129² Phase-1 tile exceeding 100 ms, or pool throughput below 25 tiles/s, on the minimum target. | §A.3 row 2 applies: WASM on performance grounds. The 2.4× margin is what makes this unlikely, not impossible — Phase 1 adds passes. **Evaluated 2026-08-06 (WP15) — does not select WASM.** See [E2a](#e2a--performance-under-phase-1-wp15). The trigger stands as worded and does not expire. |
 | **R5** | A target engine is added (a new browser, a native or server-side runtime). | The matrix's coverage claim no longer matches the target set. Extend `browser-matrix` and re-run before relying on this decision. |
 | **R6** | **Any** hash divergence is observed anywhere — a matrix cell, a hand-check, a user report, or M1 if it is ever run. | §A.3 row 3 selects the WASM kernel on **correctness** grounds regardless of performance. Status returns to **Provisional** pending the rewrite. Record the engine, version, OS, case and both hashes; do not loosen a comparison to make a cell green. This trigger does not expire, and R1 being discharged does not weaken it — it is the reason accepting M1's residual is safe rather than merely convenient. |
 

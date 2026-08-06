@@ -58,7 +58,7 @@ Without it, `pnpm check` still passes: the parity tests skip, loudly.
 ## Benchmarks
 
 ```sh
-pnpm bench           # writes bench/results/phase0.md
+pnpm bench           # writes bench/results/phase1.md
 pnpm bench:quick     # reduced iterations, for checking the harness
 ```
 
@@ -73,15 +73,20 @@ as dead code, median and p95 rather than a mean, and a control run subtracted
 from the transfer figures. Three numbers in the first draft of the results were
 wrong in ways the table did not show — see `bench/test/harness.test.ts`.
 
-`bench/src/craters.ts` was a **cost model** standing in for a crater pass that
-did not exist. It exists now (WP10), and the model's 0.700 ms per 129² tile is
-not what the real pass costs: warmed medians in Node run 21–32 ms at 65² and
-72–115 ms at 129², against a ≈100 ms budget. Those are the shape of a number
-rather than a measurement — wrong machine, not through this harness, no
-percentiles — and replacing the model with a real one is **WP15's** job, along
-with whether ADR-0001's R4 performance trigger fires and Phase 1 open question 1
-(65² vs 129²), which the gap between those two rows now bears directly on. Until
-then the model stays where it is and should not be quoted as a Phase 1 figure.
+**Every tile figure comes from the shipped path**, `TsTileGenerator.generate`.
+Phase 0 carried a standalone crater cost model alongside it — written when the
+kernel had no crater pass at all — and WP15 deleted it: the real two-tier pass
+has run inside `generate` since WP10, and two implementations of one pass is how
+the Phase 0 summary came to add a pass to a figure that already contained it.
+What the crater cost is now measured by is a differential, the same tile set at
+`densityScale` 1.0, 0.5 and 0, so the gap is the crater population and not a
+second guess at it.
+
+`bench/results/phase0.md` is **not regenerable and `--phase=0` is refused**. It
+records a machine, a generator version and a tile that no longer exist — its
+single-tile row had no crater pass in it — and ADR-0001 §E2 cites it as the
+evidence the kernel decision was made on. Use `--out=` if you genuinely mean to
+write a particular file.
 
 ## Using the viewer
 
@@ -405,7 +410,14 @@ identity — a **fixture-spec hash** over the UPPs, ruleset ids, seeds, interpre
 specs, tile set and grid size. Change a fixture's UPP, or edit a `cepheus-1`
 table under it, and that hash moves, visibly, without touching the kernel's
 version and without invalidating evidence about arithmetic that did not change.
-Given the
+
+**WP15 is the worked example.** Closing open question 1 at 65² moved `FIXTURE_N`
+from 128 to 64, which moved every hash in `fixtures.json` and left `GEN_VERSION`
+at `0.2.0` — correctly, because not one line of `packages/core/src/kernel/**`
+changed and no world any user can reach moved. What moved is which points of an
+unchanged field the manifest samples. Had that been a version bump instead, the
+repository would carry a `0.2.1` that no share URL was ever emitted under, and
+`generatorFor` would owe it a code path forever. Given the
 fixture set needs its own key regardless, folding its hashes into `manifest.json`
 would buy one file and cost the thing that matters: the battery digest would then
 move whenever a fixture changed, so every citation of it as *kernel* evidence

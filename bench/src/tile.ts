@@ -8,16 +8,23 @@
  * miss by 2× or more says switch kernels on performance grounds.
  */
 import {
+  type BasinField,
   type TileGenOutput,
   type TileGenerator,
   TsTileGenerator,
-  tileBounds,
-  tileFace,
+  bandsForDepth,
+  buildBasins,
 } from '@traveller-mainworld/core';
 
-import { compositeCraters, type CraterStats, globalCraterPass } from './craters.js';
 import { type Timing, time } from './harness.js';
-import { BENCH_WORLD, benchTiles, scratchFor, vertexCount } from './workloads.js';
+import {
+  BENCH_WORLD,
+  benchTiles,
+  scratchFor,
+  tilesAtDepth,
+  vertexCount,
+  worldAtDensity,
+} from './workloads.js';
 
 export interface TileBenchRow {
   readonly kernel: string;
@@ -70,68 +77,138 @@ export function benchTileGeneration(
   };
 }
 
-export interface CraterBenchRow {
+export interface DensityBenchRow {
   readonly n: number;
+  readonly densityScale: number;
   readonly timing: Timing;
-  readonly stats: CraterStats;
+  /**
+   * Sum of one elevation per tile, over the last iteration.
+   *
+   * Not reported, and not decoration: it is what makes "this row measured a
+   * *different* world from that row" checkable. A benchmark that took the
+   * parameter and then generated the same world three times would produce three
+   * plausible, slightly different timings and no other symptom at all.
+   */
+  readonly checksum: number;
 }
 
 /**
- * Time the crater pass on top of an already-generated tile.
+ * Time the shipped tile at a given crater density.
  *
- * Measured as an increment, not folded into the tile figure, because it is a
- * cost model for Phase-1 work rather than a measurement of anything that
- * currently ships — see `craters.ts`. Reporting it separately keeps the two
- * kinds of number distinguishable in the results table.
+ * **This replaces Phase 0's standalone crater cost model, and it is a different
+ * kind of measurement.** That model was a second implementation of a similar
+ * workload, written when the kernel had no crater pass at all; since WP10 the
+ * real two-tier pass runs inside `generate`, so the thing to measure is not an
+ * analogue of it but the difference it makes to the tile that ships.
+ *
+ * Everything except `spec.craters.densityScale` is held fixed, so the gap
+ * between the top and bottom rows is the crater population and nothing else —
+ * not the lattice walk, not the basin field, not the regolith pass, all of which
+ * run identically at every density. That is what makes the number usable as a
+ * mitigation estimate: it is the part of the tile a saturation cap could move.
  */
-export function benchCraters(n: number, iterations: number): CraterBenchRow {
+export function benchDensity(n: number, densityScale: number, iterations: number): DensityBenchRow {
   const tiles = benchTiles();
   const cache = new Map<number, TileGenOutput>();
   const out = scratchFor(n, cache);
-
-  // Generate once, outside the timed region: the crater pass is being measured,
-  // not the fBm underneath it.
+  const world = worldAtDensity(densityScale);
   const gen = new TsTileGenerator('bench');
-  const bounds = tiles.map((id) => ({ id, b: tileBounds(id), face: tileFace(id) }));
-  gen.generate(tiles[0]!, BENCH_WORLD, n, out);
-
-  let stats: CraterStats = { cellsVisited: 0, cratersPlaced: 0, vertexUpdates: 0 };
+  let checksum = 0;
 
   const timing = time(
-    `craters n=${n}`,
+    `density ${densityScale.toFixed(2)} n=${n}`,
     () => {
       let acc = 0;
-      let cells = 0;
-      let placed = 0;
-      let updates = 0;
-      for (const { b, face } of bounds) {
-        const s = compositeCraters(
-          out,
-          face,
-          b.u0,
-          b.v0,
-          b.size,
-          n,
-          BENCH_WORLD.spec.terrainAmplitudeM,
-        );
-        cells += s.cellsVisited;
-        placed += s.cratersPlaced;
-        updates += s.vertexUpdates;
-        acc += out.elevation[0]!;
+      for (const id of tiles) {
+        const tile = gen.generate(id, world, n, out);
+        acc += tile.elevation[0]!;
       }
-      stats = { cellsVisited: cells, cratersPlaced: placed, vertexUpdates: updates };
+      checksum = acc;
       return acc;
     },
     { iterations, opsPerIteration: tiles.length },
   );
 
-  return { n, timing, stats };
+  return { n, densityScale, timing, checksum };
 }
 
-/** Time the global large-crater placement pass over a 512²-per-face base grid. */
-export function benchGlobalPass(resolution: number, iterations: number): Timing {
-  return time(`global pass ${resolution}²/face`, () => globalCraterPass(resolution), {
-    iterations,
-    opsPerIteration: 1,
-  });
+export interface DepthBenchRow {
+  readonly n: number;
+  readonly depth: number;
+  /** Crater bands the gate admits at this depth — the reason the cost varies. */
+  readonly bands: number;
+  readonly timing: Timing;
+  /** As {@link DensityBenchRow.checksum}: proof each row measured a different tile set. */
+  readonly checksum: number;
+}
+
+/**
+ * Time one tile per face at each depth, separately.
+ *
+ * The headline figure averages depths 0-6 and that average is not what the
+ * budget is about. `bandsForDepth` is monotonic in depth, so the deepest tile
+ * evaluates the most bands and is the one that has to fit; an average that
+ * includes four cheap shallow tiles for every expensive deep one can report a
+ * pass on a workload whose worst member misses.
+ */
+export function benchByDepth(n: number, maxDepth: number, iterations: number): DepthBenchRow[] {
+  const cache = new Map<number, TileGenOutput>();
+  const out = scratchFor(n, cache);
+  const gen = new TsTileGenerator('bench');
+  const rows: DepthBenchRow[] = [];
+
+  for (let depth = 0; depth <= maxDepth; depth++) {
+    const tiles = tilesAtDepth(depth);
+    let checksum = 0;
+    const timing = time(
+      `depth ${depth} n=${n}`,
+      () => {
+        let acc = 0;
+        for (const id of tiles) {
+          const tile = gen.generate(id, BENCH_WORLD, n, out);
+          acc += tile.elevation[0]!;
+        }
+        checksum = acc;
+        return acc;
+      },
+      { iterations, opsPerIteration: tiles.length },
+    );
+    rows.push({ n, depth, bands: bandsForDepth(depth), timing, checksum });
+  }
+
+  return rows;
+}
+
+export interface BasinBenchRow {
+  readonly timing: Timing;
+  /** Basins the field actually holds, at the benchmark world's density. */
+  readonly count: number;
+}
+
+/**
+ * Time the tier-1 global basin pass — the shipped one, `buildBasins`.
+ *
+ * Phase 0 measured a synthetic stand-in here and reported it as a once-per-world
+ * cost. It is not once per world: `generateTile` rebuilds the field on **every
+ * tile**, deliberately, so that the tile path and the export path cannot
+ * disagree about it. So this row is a per-tile cost that is already inside the
+ * single-tile figure, and it is measured separately because it is the one part
+ * of the pass that does not scale with the grid.
+ */
+export function benchBasins(iterations: number): BasinBenchRow {
+  const { seedHi, seedLo } = BENCH_WORLD;
+  const density = BENCH_WORLD.spec.craters.densityScale;
+  // Reused across calls, as the generator reuses its module-level store.
+  let store: BasinField | undefined;
+
+  const timing = time(
+    'basin field',
+    () => {
+      store = buildBasins(seedHi, seedLo, density, store);
+      return store.count;
+    },
+    { iterations, opsPerIteration: 1 },
+  );
+
+  return { timing, count: store?.count ?? 0 };
 }

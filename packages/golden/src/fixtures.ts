@@ -34,15 +34,34 @@ import {
 /**
  * Grid resolution of every fixture tile; the vertex grid is `(n+1)²`.
  *
- * 128 gives the 129² grid the spike plan calls the representative Phase-1 tile
- * (§B.1), which is also the grid the R13 budgets were measured against in
- * ADR-0001 §E2 and the size `tile.composite` uses in the battery. Open question
- * 1 — 65² or 129² for the viewer's *mesh* — is a separate question: this pins
- * what the generator is hashed at, not what the renderer draws. If the mesh
- * lands at 65², the shipped path stops being the hashed path and this set
- * should grow a 65² arm under the change protocol.
+ * **64, since WP15 closed open question 1 at 65².** It was 128 from WP1, which
+ * meant this file pinned a sampling of the field that the viewer never took:
+ * `main.ts` meshes at 65², so every determinism claim in the repository was
+ * about a grid the shipped path did not draw at. A golden fixture's job is to
+ * say "this UPP and this seed make this world" — and the world it certifies has
+ * to be the one the application actually computes.
+ *
+ * The choice of 65² is argued in `bench/results/phase1.md` §Grid size and rests
+ * on two constants outside this package: the viewer's screen-space error does
+ * not read the grid resolution, so a 129² mesh draws the *same* tiles with four
+ * times the vertices rather than replacing four tiles with one; and
+ * `bandsForDepth` gates crater bands on `BAND_GATE_N = 64`, so both grids sample
+ * an identical field. 129² was four times the generation cost for no more
+ * detail, and it was the only one of the two that exceeded the R13 budget.
+ *
+ * **Moving this moved the fixture-spec hash and not `GEN_VERSION`**, which is
+ * the whole reason there are two identities. The generator's arithmetic did not
+ * change; no world any user can reach changed; what changed is which points of
+ * an unchanged field this manifest samples. `fixtureSpecHash` covers `n` for
+ * exactly this case, and `fixtureManifestPreflight` refuses to compare hashes
+ * across a grid change rather than reporting a false mismatch.
+ *
+ * The **battery** stays at 129² deliberately — see `battery.ts`. It answers a
+ * different question: whether two engines agree on the arithmetic, where a finer
+ * sampling is strictly more discriminating and no claim about the shipped grid
+ * is being made.
  */
-export const FIXTURE_N = 128;
+export const FIXTURE_N = 64;
 
 /** Deepest fixture tile. Depths 0–6, per implementation plan §7.1. */
 export const FIXTURE_MAX_DEPTH = 6;

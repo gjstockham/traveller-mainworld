@@ -56,8 +56,63 @@ export const BENCH_WORLD: World = Object.freeze({
   seedLo: 0x12345678,
 });
 
+/**
+ * The benchmark world with its crater density overridden.
+ *
+ * The other arm of the density differential in `tile.ts`. Everything else is
+ * {@link BENCH_WORLD} to the field, so the difference between two runs is
+ * attributable to the crater population and to nothing else — which is the only
+ * way to say what a saturation cap would actually buy.
+ *
+ * At `0` the acceptance test rejects every candidate (`hashToUnit(h) >= 0` is
+ * always true), so no crater and no basin survives while the lattice walk, the
+ * per-candidate hash and the regolith pass all still run. That is the point:
+ * the difference is the cost of the craters, not the cost of the machinery that
+ * looks for them.
+ */
+export function worldAtDensity(densityScale: number): World {
+  return Object.freeze({
+    ...BENCH_WORLD,
+    spec: {
+      ...BENCH_WORLD.spec,
+      craters: { ...BENCH_WORLD.spec.craters, densityScale },
+    },
+  });
+}
+
+/**
+ * Crater density the benchmark UPP interprets to.
+ *
+ * `X800000-0` is Atmosphere 0, which is the **most expensive** crater field the
+ * ruleset produces — a saturated airless surface. That is the right world for a
+ * budget check and the wrong one for a typical-case number, so the density
+ * sweep in the results reports the curve rather than one point on it.
+ */
+export const BENCH_DENSITY = BENCH_WORLD.spec.craters.densityScale;
+
 /** The two grid resolutions open question 1 is between. */
 export const GRID_SIZES = Object.freeze([64, 128]);
+
+/**
+ * One tile per face at a given quadtree depth.
+ *
+ * {@link benchTiles} spreads over depths and averages them, which is the right
+ * shape for a headline figure and hides the thing WP15 has to know: the crater
+ * band gate admits bands *with* depth, so a deep tile does strictly more work
+ * than a shallow one. A budget met on an average of depths 0-6 is not a budget
+ * met on the tiles a user zoomed in to see.
+ */
+export function tilesAtDepth(depth: number): number[] {
+  const tiles: number[] = [];
+  for (let face = 0; face < 6; face++) {
+    let path = 0;
+    for (let d = 0; d < depth; d++) {
+      path = path * 4 + ((face + d) % 4);
+    }
+    tiles.push(makeTileId(face, depth, path));
+  }
+  return tiles;
+}
 
 /** Vertices in a `(n+1)²` grid. */
 export function vertexCount(n: number): number {

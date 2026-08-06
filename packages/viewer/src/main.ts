@@ -48,7 +48,23 @@ import { DEFAULT_SEED, DEFAULT_UPP, type WorldChoice, chooseWorld, uppWorld } fr
 /** Planet radius in scene units. Everything else is expressed relative to this. */
 const RADIUS = 1;
 
-/** Grid resolution per tile. 65² for now; Spike B decides 65 vs 129 on measurement. */
+/**
+ * Grid resolution per tile — a 65² vertex mesh.
+ *
+ * **Open question 1, closed at 65² in WP15** and no longer provisional. The
+ * measurement is `bench/results/phase1.md` §Grid size; the two facts it turns on
+ * are both about code rather than about milliseconds. {@link screenSpaceError}
+ * does not read this constant, so raising it would draw the *same* tiles with
+ * four times the vertices rather than replacing four tiles with one; and
+ * `bandsForDepth` gates crater bands on `BAND_GATE_N = 64`, so a finer mesh
+ * samples an identical field. 129² measured 3.8× the generation cost for no
+ * extra detail, and was the only one of the two to exceed the R13 budget.
+ *
+ * The golden fixtures moved to match this in the same work package — before
+ * WP15 they hashed at 129², so the shipped path was not the hashed path.
+ * Raising it now means raising `BAND_GATE_N` with it, which is a kernel change
+ * under the full change protocol, not a viewer tuning knob.
+ */
 const TILE_N = 64;
 
 /**
