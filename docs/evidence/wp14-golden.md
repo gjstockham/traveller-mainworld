@@ -12,7 +12,8 @@ Identities after this work package:
 | Fixture digest | `9d20abd809becf92…` |
 | Ruleset `cepheus-1` | `1aee16af5a72464b…` — **unmoved since WP9**, and it must stay that way |
 
-`pnpm check` green: 43 files, 742 tests. All four golden artefacts verify.
+`pnpm check` green: 43 files, 743 tests. All four golden artefacts verify, and
+the twelve-cell matrix is green on `14212ed` (§8).
 
 ---
 
@@ -289,12 +290,13 @@ usually means the harness is wrong* — the same lesson WP12 learned at 170°.
 
 ## 8. What was not checked
 
-- **Nothing here has been run in a browser.** WP14 is Node work and barely
-  exposed to it, but the twelve-cell matrix has not been run for `0.2.0`: the new
-  battery case and the regenerated fixtures are verified on Node under WSL2 only.
-  The plan's *"twelve CI cells green on the new manifests"* is **not yet
-  evidenced** — it needs a push. This is the acceptance half WP14 cannot self-
-  certify.
+- ~~**The twelve-cell matrix has not been run for `0.2.0`.**~~ **Now evidenced.**
+  Run `31086245914` on commit `14212ed`: all twelve green — chromium, firefox and
+  webkit × ubuntu, macOS and Windows, plus the three Node reference cells — along
+  with the `golden` and `build-invariance` jobs. So the new battery case and the
+  regenerated fixtures reproduce bit-for-bit on three engines and three operating
+  systems, which is the half of plan §9's acceptance WP14 could not self-certify
+  from one machine. **Both halves of the acceptance are now met.**
 - **The WASM parity leg was not run.** `pnpm check:parity` needs a `wasm:build`,
   and `noise.fbm3.params` is a new case the twin has never evaluated. It exercises
   `fbm3` with parameters the marshalling already passes, so there is no reason to
